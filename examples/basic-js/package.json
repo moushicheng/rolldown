@@ -1,0 +1,17 @@
+{
+  "name": "@example/basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:rolldown && npm run build:rollup",
+    "build:rolldown": "node rolldown.js",
+    "build:rollup": "node rollup.js",
+    "clean": "git clean -fx dist rollup_build rolldown_build"
+  },
+  "keywords": [],
+  "author": "",
+  "devDependencies": {
+    "rolldown": "workspace:*",
+    "rollup": "^4.13.0"
+  }
+}

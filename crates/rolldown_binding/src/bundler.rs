@@ -23,6 +23,8 @@ impl Bundler {
     input_options: BindingInputOptions,
     output_options: BindingOutputOptions,
   ) -> napi::Result<Self> {
+    print!("{:?}", input_options);
+    print!("114514");
     try_init_custom_trace_subscriber(env);
     let ret = normalize_binding_options(input_options, output_options)?;
 
