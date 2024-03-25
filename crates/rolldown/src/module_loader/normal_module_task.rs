@@ -7,10 +7,8 @@ use rolldown_common::{
   AstScope, FilePath, ImportRecordId, ModuleType, NormalModuleId, RawImportRecord, ResolvedPath,
   ResourceId, SymbolRef,
 };
-use rolldown_fs::FileSystem;
 use rolldown_oxc_utils::{OxcCompiler, OxcProgram};
 use rolldown_plugin::{HookResolveIdExtraOptions, SharedPluginDriver};
-use rolldown_resolver::Resolver;
 use sugar_path::AsPath;
 
 use super::{module_task_context::ModuleTaskCommonData, Msg};
@@ -24,18 +22,19 @@ use crate::{
     resolved_request_info::ResolvedRequestInfo,
   },
   utils::{load_source::load_source, resolve_id::resolve_id, transform_source::transform_source},
+  SharedResolver,
 };
-pub struct NormalModuleTask<'task, T: FileSystem + Default> {
-  ctx: &'task ModuleTaskCommonData<T>,
+pub struct NormalModuleTask<'task> {
+  ctx: &'task ModuleTaskCommonData,
   module_id: NormalModuleId,
   resolved_path: ResolvedPath,
   module_type: ModuleType,
   errors: BatchedErrors,
 }
 
-impl<'task, T: FileSystem + Default + 'static> NormalModuleTask<'task, T> {
+impl<'task> NormalModuleTask<'task> {
   pub fn new(
-    ctx: &'task ModuleTaskCommonData<T>,
+    ctx: &'task ModuleTaskCommonData,
     id: NormalModuleId,
     path: ResolvedPath,
     module_type: ModuleType,
@@ -117,7 +116,7 @@ impl<'task, T: FileSystem + Default + 'static> NormalModuleTask<'task, T> {
       source: Some(source),
       id: Some(self.module_id),
       repr_name: Some(repr_name),
-      path: Some(ResourceId::new(self.resolved_path.path.clone())),
+      path: Some(ResourceId::new(Arc::<str>::clone(&self.resolved_path.path).into())),
       named_imports: Some(named_imports),
       named_exports: Some(named_exports),
       stmt_infos: Some(stmt_infos),
@@ -185,7 +184,8 @@ impl<'task, T: FileSystem + Default + 'static> NormalModuleTask<'task, T> {
       std::mem::take(&mut symbol_table.resolved_references),
     );
     let mut symbol_for_module = AstSymbols::from_symbol_table(symbol_table);
-    let repr_name = self.resolved_path.path.representative_name();
+    let file_path = Arc::<str>::clone(&self.resolved_path.path).into();
+    let repr_name = FilePath::representative_name(&file_path);
     let scanner = AstScanner::new(
       self.module_id,
       &ast_scope,
@@ -193,7 +193,7 @@ impl<'task, T: FileSystem + Default + 'static> NormalModuleTask<'task, T> {
       repr_name.into_owned(),
       self.module_type,
       source,
-      &self.resolved_path.path,
+      &file_path,
     );
     let namespace_symbol = scanner.namespace_ref;
     program.hoist_import_export_from_stmts();
@@ -203,11 +203,11 @@ impl<'task, T: FileSystem + Default + 'static> NormalModuleTask<'task, T> {
   }
 
   #[allow(clippy::option_if_let_else)]
-  pub(crate) async fn resolve_id<F: FileSystem + Default>(
+  pub(crate) async fn resolve_id(
     input_options: &SharedNormalizedInputOptions,
-    resolver: &Resolver<F>,
+    resolver: &SharedResolver,
     plugin_driver: &SharedPluginDriver,
-    importer: &FilePath,
+    importer: &str,
     specifier: &str,
     options: HookResolveIdExtraOptions,
   ) -> BatchedResult<ResolvedRequestInfo> {

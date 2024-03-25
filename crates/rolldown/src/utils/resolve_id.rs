@@ -1,12 +1,12 @@
+use std::path::Path;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rolldown_common::{FilePath, ModuleType};
+use rolldown_common::ModuleType;
 use rolldown_error::BuildError;
-use rolldown_fs::FileSystem;
 use rolldown_plugin::{HookResolveIdArgs, HookResolveIdExtraOptions, SharedPluginDriver};
-use rolldown_resolver::Resolver;
 
-use crate::types::resolved_request_info::ResolvedRequestInfo;
+use crate::{types::resolved_request_info::ResolvedRequestInfo, SharedResolver};
 
 static HTTP_URL_REGEX: Lazy<Regex> =
   Lazy::new(|| Regex::new(r"^(https?:)?\/\/").expect("Init HTTP_URL_REGEX failed"));
@@ -14,11 +14,11 @@ static DATA_URL_REGEX: Lazy<Regex> =
   Lazy::new(|| Regex::new(r"^\s*data:").expect("Init DATA_URL_REGEX failed"));
 
 #[allow(clippy::no_effect_underscore_binding)]
-pub async fn resolve_id<T: FileSystem + Default>(
-  resolver: &Resolver<T>,
+pub async fn resolve_id(
+  resolver: &SharedResolver,
   plugin_driver: &SharedPluginDriver,
   request: &str,
-  importer: Option<&FilePath>,
+  importer: Option<&str>,
   options: HookResolveIdExtraOptions,
   _preserve_symlinks: bool,
 ) -> Result<ResolvedRequestInfo, BuildError> {
@@ -50,7 +50,7 @@ pub async fn resolve_id<T: FileSystem + Default>(
   // Rollup external node packages by default.
   // Rolldown will follow esbuild behavior to resolve it by default.
   // See https://github.com/rolldown/rolldown/issues/282
-  let resolved = resolver.resolve(importer, request)?;
+  let resolved = resolver.resolve(importer.map(Path::new), request)?;
   Ok(ResolvedRequestInfo {
     path: resolved.resolved,
     module_type: resolved.module_type,

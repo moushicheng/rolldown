@@ -1419,6 +1419,8 @@ dependencies = [
  "oxc",
  "regex",
  "rolldown_error",
+ "rolldown_fs",
+ "rolldown_resolver",
  "rolldown_rstr",
  "rolldown_sourcemap",
  "rustc-hash",
@@ -1460,6 +1462,8 @@ dependencies = [
  "futures",
  "rolldown_common",
  "rolldown_error",
+ "rolldown_fs",
+ "rolldown_resolver",
  "rolldown_sourcemap",
  "rolldown_utils",
  "tracing",
@@ -1491,7 +1495,6 @@ name = "rolldown_resolver"
 version = "0.0.1"
 dependencies = [
  "oxc_resolver",
- "rolldown_common",
  "rolldown_error",
  "rolldown_fs",
  "sugar_path",

@@ -1,10 +1,11 @@
 {
   "name": "@rolldown/wasm-binding",
-  "version": "0.0.5",
   "license": "MIT",
+  "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/rolldown/rolldown"
+    "url": "https://github.com/rolldown/rolldown.git",
+    "directory": "creates/rolldown_binding_wasm"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",

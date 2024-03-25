@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rolldown_fs::OsFileSystem;
+use rolldown_fs::{FileSystem, OsFileSystem};
 use rolldown_plugin::{BoxPlugin, HookBuildEndArgs, SharedPluginDriver};
 
 use sugar_path::AsPath;
@@ -17,19 +17,19 @@ use crate::{
     normalized_output_options::NormalizedOutputOptions,
   },
   stages::{bundle_stage::BundleStage, scan_stage::ScanStage},
-  types::{bundler_fs::BundlerFileSystem, rolldown_output::RolldownOutput},
+  types::rolldown_output::RolldownOutput,
   InputOptions, OutputOptions, SharedResolver,
 };
 
-pub struct Bundler<T: BundlerFileSystem> {
+pub struct Bundler {
   pub(crate) input_options: SharedNormalizedInputOptions,
   pub(crate) output_options: NormalizedOutputOptions,
   pub(crate) plugin_driver: SharedPluginDriver,
-  pub(crate) fs: T,
-  pub(crate) resolver: SharedResolver<T>,
+  pub(crate) fs: OsFileSystem,
+  pub(crate) resolver: SharedResolver,
 }
 
-impl Bundler<OsFileSystem> {
+impl Bundler {
   pub fn new(input_options: InputOptions, output_options: OutputOptions) -> Self {
     BundlerBuilder::default()
       .with_input_options(input_options)
@@ -50,7 +50,7 @@ impl Bundler<OsFileSystem> {
   }
 }
 
-impl<T: BundlerFileSystem> Bundler<T> {
+impl Bundler {
   pub async fn write(&mut self) -> BatchedResult<RolldownOutput> {
     let dir =
       self.input_options.cwd.as_path().join(&self.output_options.dir).to_string_lossy().to_string();
@@ -122,7 +122,7 @@ impl<T: BundlerFileSystem> Bundler<T> {
     ScanStage::new(
       Arc::clone(&self.input_options),
       Arc::clone(&self.plugin_driver),
-      self.fs.share(),
+      self.fs.clone(),
       Arc::clone(&self.resolver),
     )
     .scan()
