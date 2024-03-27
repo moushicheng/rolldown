@@ -1,6 +1,6 @@
 {
   "name": "rolldown",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Fast JavaScript/TypeScript bundler in Rust with Rollup-compatible API.",
   "homepage": "https://rolldown.rs/",
   "repository": {
@@ -50,9 +50,9 @@
     "build": "pnpm build-binding && pnpm build-node && pnpm format-generated-binding-files",
     "build:release": "pnpm build-binding:release && pnpm build-node && pnpm format-generated-binding-files",
     "# Scrips for checking #": "_",
-    "test": "vitest run",
+    "test": "vitest run --reporter verbose",
     "test:update": "vitest run -u",
-    "type-check": "tsc -p tsconfig.check.json"
+    "type-check": "tsc"
   },
   "napi": {
     "binaryName": "rolldown-binding",
@@ -76,21 +76,23 @@
     "colorette": "^2.0.20",
     "consola": "^3.2.3",
     "glob": "^10.3.10",
+    "rolldown": "workspace:*",
     "rollup": "^4.12.1",
     "type-fest": "^4.12.0",
     "unbuild": "^2.0.0",
-    "vitest": "^1.3.1"
+    "vitest": "^1.3.1",
+    "fast-glob": "^3.3.2"
   },
   "optionalDependencies": {
+    "@rolldown/binding-darwin-arm64": "workspace:*",
     "@rolldown/binding-darwin-x64": "workspace:*",
-    "@rolldown/binding-win32-x64-msvc": "workspace:*",
-    "@rolldown/binding-linux-x64-gnu": "workspace:*",
-    "@rolldown/binding-linux-x64-musl": "workspace:*",
-    "@rolldown/binding-win32-ia32-msvc": "workspace:*",
     "@rolldown/binding-linux-arm-gnueabihf": "workspace:*",
     "@rolldown/binding-linux-arm64-gnu": "workspace:*",
-    "@rolldown/binding-darwin-arm64": "workspace:*",
     "@rolldown/binding-linux-arm64-musl": "workspace:*",
-    "@rolldown/binding-win32-arm64-msvc": "workspace:*"
+    "@rolldown/binding-linux-x64-gnu": "workspace:*",
+    "@rolldown/binding-linux-x64-musl": "workspace:*",
+    "@rolldown/binding-win32-arm64-msvc": "workspace:*",
+    "@rolldown/binding-win32-ia32-msvc": "workspace:*",
+    "@rolldown/binding-win32-x64-msvc": "workspace:*"
   }
 }

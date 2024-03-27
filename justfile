@@ -16,8 +16,8 @@ roll-rust:
     just lint-rust
 
 roll-node:
-    just check-node
     just test-node
+    just check-node
     just lint-node
 
 roll-repo:
@@ -112,15 +112,8 @@ bench:
 
 # RELEASING
 
-change:
-    pnpm changeset add
+bump packages *args: 
+  node ./scripts/bump-version.js {{args}}
 
-no-change:
-    pnpm changeset add --empty
-
-version:
-    pnpm changeset version
-
-publish:
-    pnpm changeset publish
-    git push --follow-tags
+changelog:
+  pnpm conventional-changelog --preset angular --i CHANGELOG.md --same-file --pkg=./packages/rolldown/package.json
