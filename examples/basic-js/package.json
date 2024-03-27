@@ -3,9 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:rolldown && npm run build:rollup",
+    "build": "npm run build:rolldown",
     "build:rolldown": "node rolldown.js",
-    "build:rollup": "node rollup.js",
     "clean": "git clean -fx dist rollup_build rolldown_build"
   },
   "keywords": [],
