@@ -1,14 +1,10 @@
 type MaybePromise<T> = T | Promise<T>
 export class BindingPluginContext {
-<<<<<<< HEAD
-
-=======
   resolve(
     specifier: string,
     importer: string | undefined | null,
     extraOptions: BindingPluginContextResolveOptions,
   ): void
->>>>>>> chore-mixed-debugger
 }
 
 export class Bundler {
@@ -90,15 +86,11 @@ export interface BindingPluginContextResolveOptions {
 export interface BindingPluginOptions {
   name: string
   buildStart?: (ctx: BindingPluginContext) => MaybePromise<void>
-<<<<<<< HEAD
-  resolveId?: (specifier: string, importer?: string, options?: BindingHookResolveIdExtraOptions) => MaybePromise<undefined | BindingHookResolveIdOutput>
-=======
   resolveId?: (
     specifier: string,
     importer: string | undefined,
     options: BindingHookResolveIdExtraOptions,
   ) => MaybePromise<undefined | BindingHookResolveIdOutput>
->>>>>>> chore-mixed-debugger
   load?: (id: string) => MaybePromise<undefined | BindingHookLoadOutput>
   transform?: (id: string, code: string) => MaybePromise<undefined | BindingHookLoadOutput>
   buildEnd?: (error?: string) => MaybePromise<void>
