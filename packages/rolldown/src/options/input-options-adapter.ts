@@ -1,7 +1,7 @@
 import { NormalizedInputOptions } from '../rollup-types'
 import { BindingInputOptions } from '../binding'
 import nodePath from 'node:path'
-import { createBuildPluginAdapter } from './create-build-plugin-adapter'
+import { bindingifyPlugin } from '../plugin/bindingify-plugin'
 import { InputOptions, RolldownNormalizedInputOptions } from './input-options'
 
 export function createInputOptionsAdapter(
@@ -11,9 +11,10 @@ export function createInputOptionsAdapter(
   return {
     input: normalizeInput(options.input),
     plugins: options.plugins.map((plugin) =>
-      createBuildPluginAdapter(plugin, options),
+      // @ts-expect-error
+      bindingifyPlugin(plugin, options),
     ),
-    cwd: process.cwd(),
+    cwd: inputOptions.cwd ?? process.cwd(),
     external: inputOptions.external ? options.external : undefined,
     resolve: options.resolve,
   }

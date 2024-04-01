@@ -1,18 +1,15 @@
-import type { RollupOptions, RollupOutput } from 'rolldown'
-import path from 'node:path'
+import { defineTest } from '@tests'
 import { expect } from 'vitest'
-import { getOutputChunkNames } from '../../../util'
+import { getOutputChunkNames } from '@tests/utils'
 
-const config: RollupOptions = {
-  input: {
-    main: path.join(__dirname, 'main.js'),
-    entry: path.join(__dirname, 'entry.js'),
+export default defineTest({
+  config: {
+    input: {
+      main: 'main.js',
+      entry: 'entry.js',
+    },
   },
-}
-
-export default {
-  config,
-  afterTest: (output: RollupOutput) => {
+  afterTest: (output) => {
     expect(getOutputChunkNames(output)).toMatchInlineSnapshot(`
       [
         "entry.js",
@@ -20,4 +17,4 @@ export default {
       ]
     `)
   },
-}
+})

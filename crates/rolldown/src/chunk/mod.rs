@@ -10,7 +10,8 @@ use rolldown_common::ChunkId;
 pub type ChunksVec = IndexVec<ChunkId, Chunk>;
 
 use rolldown_common::{
-  ChunkKind, ExternalModuleId, NamedImport, NormalModuleId, RenderedModule, Specifier, SymbolRef,
+  ChunkKind, ExternalModuleId, NamedImport, NormalModuleId, RenderedChunk, RenderedModule,
+  Specifier, SymbolRef,
 };
 use rolldown_error::BuildError;
 use rolldown_rstr::Rstr;
@@ -55,7 +56,7 @@ pub struct Chunk {
 pub struct ChunkRenderReturn {
   pub code: String,
   pub map: Option<SourceMap>,
-  pub rendered_modules: FxHashMap<String, RenderedModule>,
+  pub rendered_chunk: RenderedChunk,
 }
 
 impl Chunk {
@@ -80,7 +81,7 @@ impl Chunk {
   }
 
   #[allow(clippy::unnecessary_wraps, clippy::cast_possible_truncation)]
-  pub fn render(
+  pub async fn render(
     &self,
     input_options: &NormalizedInputOptions,
     graph: &LinkStageOutput,
@@ -108,17 +109,11 @@ impl Chunk {
             input_options,
           },
           &graph.ast_table[m.id],
-          if output_options.sourcemap.is_hidden() {
-            None
-          } else {
-            Some(
-              m.resource_id
+          m.resource_id
                 .expect_file()
                 .relative_path(&input_options.cwd)
-                .to_string_lossy()
-                .to_string(),
-            )
-          },
+                .to_string_lossy().as_ref(),
+           !output_options.sourcemap.is_hidden()
         );
         Some((
           m.resource_id.expect_file().to_string(),
@@ -155,13 +150,25 @@ impl Chunk {
           Ok(())
         },
       )?;
+    let rendered_chunk = self.get_rendered_chunk_info(graph, output_options, rendered_modules);
+
+    // TODO avoid rendered_chunk clone
+    // add banner
+    if let Some(banner_txt) = output_options.banner.call(rendered_chunk.clone()).await? {
+      concat_source.add_prepend_source(Box::new(RawSource::new(banner_txt)));
+    }
 
     if let Some(exports) = self.render_exports(graph, output_options) {
       concat_source.add_source(Box::new(RawSource::new(exports)));
     }
 
+    // add footer
+    if let Some(footer_txt) = output_options.footer.call(rendered_chunk.clone()).await? {
+      concat_source.add_source(Box::new(RawSource::new(footer_txt)));
+    }
+
     let (content, map) = concat_source.content_and_sourcemap();
 
-    Ok(ChunkRenderReturn { code: content, map, rendered_modules })
+    Ok(ChunkRenderReturn { code: content, map, rendered_chunk })
   }
 }

@@ -1,3 +1,4 @@
+use crate::AddonOutputOption;
 use derivative::Derivative;
 
 #[derive(Debug)]
@@ -38,6 +39,8 @@ pub struct OutputOptions {
   pub dir: Option<String>,
   pub format: Option<OutputFormat>,
   pub sourcemap: Option<SourceMapType>,
+  pub banner: Option<AddonOutputOption>,
+  pub footer: Option<AddonOutputOption>,
 }
 
 // impl Default for OutputOptions {

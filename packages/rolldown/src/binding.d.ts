@@ -1,4 +1,29 @@
 type MaybePromise<T> = T | Promise<T>
+type Nullable<T> = T | null | undefined
+type VoidNullable<T = void> = T | null | undefined | void
+export class BindingOutputAsset {
+  get fileName(): string
+  get source(): string
+}
+
+export class BindingOutputChunk {
+  get isEntry(): boolean
+  get isDynamicEntry(): boolean
+  get facadeModuleId(): string | null
+  get moduleIds(): Array<string>
+  get exports(): Array<string>
+  get fileName(): string
+  get modules(): Record<string, BindingRenderedModule>
+  get code(): string
+  get map(): string | null
+  get sourcemapFileName(): string | null
+}
+
+export class BindingOutputs {
+  get chunks(): Array<BindingOutputChunk>
+  get assets(): Array<BindingOutputAsset>
+}
+
 export class BindingPluginContext {
   resolve(
     specifier: string,
@@ -46,37 +71,20 @@ export interface BindingInputOptions {
   cwd: string
 }
 
-export interface BindingOutputAsset {
-  fileName: string
-  source: string
-}
-
-export interface BindingOutputChunk {
-  isEntry: boolean
-  isDynamicEntry: boolean
-  facadeModuleId?: string
-  moduleIds: Array<string>
-  exports: Array<string>
-  fileName: string
-  modules: Record<string, BindingRenderedModule>
-  code: string
-  map?: string
-  sourcemapFileName?: string
-}
-
 export interface BindingOutputOptions {
   entryFileNames?: string
   chunkFileNames?: string
+  banner?:
+    | Nullable<string>
+    | ((chunk: RenderedChunk) => MaybePromise<VoidNullable<string>>)
   dir?: string
   exports?: 'default' | 'named' | 'none' | 'auto'
+  footer?:
+    | Nullable<string>
+    | ((chunk: RenderedChunk) => MaybePromise<VoidNullable<string>>)
   format?: 'es' | 'cjs'
   plugins: Array<BindingPluginOptions>
   sourcemap?: 'file' | 'inline' | 'hidden'
-}
-
-export interface BindingOutputs {
-  chunks: Array<BindingOutputChunk>
-  assets: Array<BindingOutputAsset>
 }
 
 export interface BindingPluginContextResolveOptions {
@@ -85,18 +93,27 @@ export interface BindingPluginContextResolveOptions {
 
 export interface BindingPluginOptions {
   name: string
-  buildStart?: (ctx: BindingPluginContext) => MaybePromise<void>
+  buildStart?: (ctx: BindingPluginContext) => MaybePromise<VoidNullable>
   resolveId?: (
     specifier: string,
-    importer: string | undefined,
+    importer: Nullable<string>,
     options: BindingHookResolveIdExtraOptions,
-  ) => MaybePromise<undefined | BindingHookResolveIdOutput>
-  load?: (id: string) => MaybePromise<undefined | BindingHookLoadOutput>
-  transform?: (id: string, code: string) => MaybePromise<undefined | BindingHookLoadOutput>
-  buildEnd?: (error?: string) => MaybePromise<void>
-  renderChunk?: (code: string, chunk: RenderedChunk) => MaybePromise<undefined | BindingHookRenderChunkOutput>
-  generateBundle?: (bundle: Outputs, isWrite: boolean) => MaybePromise<void>
-  writeBundle?: (bundle: Outputs) => MaybePromise<void>
+  ) => MaybePromise<VoidNullable<BindingHookResolveIdOutput>>
+  load?: (id: string) => MaybePromise<VoidNullable<BindingHookLoadOutput>>
+  transform?: (
+    id: string,
+    code: string,
+  ) => MaybePromise<VoidNullable<BindingHookLoadOutput>>
+  buildEnd?: (error: Nullable<string>) => MaybePromise<VoidNullable>
+  renderChunk?: (
+    code: string,
+    chunk: RenderedChunk,
+  ) => MaybePromise<VoidNullable<BindingHookRenderChunkOutput>>
+  generateBundle?: (
+    bundle: BindingOutputs,
+    isWrite: boolean,
+  ) => MaybePromise<VoidNullable>
+  writeBundle?: (bundle: BindingOutputs) => MaybePromise<VoidNullable>
 }
 
 export interface BindingRenderedModule {
