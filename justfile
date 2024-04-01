@@ -16,8 +16,8 @@ roll-rust:
     just lint-rust
 
 roll-node:
-    just check-node
     just test-node
+    just check-node
     just lint-node
 
 roll-repo:
@@ -30,7 +30,7 @@ init:
     git submodule update --init
 
 init-rust:
-    cargo binstall taplo-cli cargo-insta cargo-deny typos-cli -y
+    cargo binstall taplo-cli cargo-insta cargo-deny -y
 
 init-node:
     pnpm install
@@ -50,13 +50,9 @@ check-rust:
 check-node:
     pnpm type-check
 
-check-typo:
-    typos
-
 check:
     just check-rust
     just check-node
-    just check-typo
 
 # run tests for both Rust and Node.js
 test:
@@ -112,15 +108,8 @@ bench:
 
 # RELEASING
 
-change:
-    pnpm changeset add
+bump packages *args: 
+  node ./scripts/bump-version.js {{args}}
 
-no-change:
-    pnpm changeset add --empty
-
-version:
-    pnpm changeset version
-
-publish:
-    pnpm changeset publish
-    git push --follow-tags
+changelog:
+  pnpm conventional-changelog --preset angular --i CHANGELOG.md --same-file --pkg=./packages/rolldown/package.json
