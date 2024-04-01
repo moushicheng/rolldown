@@ -6,33 +6,38 @@
   "configurations": [
     {
       "name": "debug-js-basic",
-      "program": "./node_modules/rolldown/bin/cli.js",
-      "args": ["--config", "./rolldown.config.js"],
-      "request": "launch",
-      "skipFiles": ["<node_internals>/**"],
-      // build before debug
-      "preLaunchTask": "build rolldown",
-      "cwd": "${workspaceFolder}/examples/basic-vue",
-      "console": "internalConsole",
-      "internalConsoleOptions": "openOnSessionStart",
-      "type": "node"
+      "port": 9229,
+      "request": "attach",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "sourceMaps": true,
+      "continueOnAttach": true,
+      "type": "node",
+      "presentation": {
+        "hidden": true
+      }
     },
     {
       "type": "lldb",
       "request": "launch",
-      "sourceLanguages": ["rust"],
+      "sourceLanguages": [
+        "rust"
+      ],
       "name": "debug-rust-basic",
       "program": "node",
       "args": [
-        "./node_modules/rolldown/bin/cli.js",
+        "--inspect-brk",
+        "${workspaceFolder}/packages/rolldown/bin/cli",
         "--config",
         "./rolldown.config.js"
       ],
-      // build before debug
-      "preLaunchTask": "build rolldown",
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart",
-      "cwd": "${workspaceFolder}/examples/basic-vue"
+      "cwd": "${workspaceFolder}/examples/basic-vue",
+      "presentation": {
+        "hidden": true
+      }
     },
     {
       "type": "lldb",
@@ -49,4 +54,18 @@
       "name": "Attach:Rust",
     },
   ],
+  "compounds": [
+    {
+      "name": "debug-basic",
+      "configurations": [
+        "debug-js-basic",
+        "debug-rust-basic"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "group": "examples",
+        "order": 1
+      }
+    }
+  ]
 }
