@@ -32,6 +32,8 @@
         "--config",
         "./rolldown.config.js"
       ],
+      // build before debug
+      "preLaunchTask": "build rolldown",
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart",
       "cwd": "${workspaceFolder}/examples/basic-vue",

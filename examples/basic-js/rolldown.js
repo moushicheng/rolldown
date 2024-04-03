@@ -2,6 +2,13 @@ import { rolldown } from 'rolldown'
 
 const bundle = await rolldown({
   input: 'app.js',
+  plugins: [
+    {
+      buildStart: (...params) => {
+        console.log('build start', params);
+      }
+    }
+  ]
 })
 
 

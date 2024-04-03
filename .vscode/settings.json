@@ -9,7 +9,7 @@
   },
   "[javascript]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "vscode.typescript-language-features"
   },
   "[javascriptreact]": {
     "editor.formatOnSave": true,
@@ -34,7 +34,9 @@
   "git.ignoreLimitWarning": true,
   "json.schemas": [
     {
-      "fileMatch": ["test.config.json"],
+      "fileMatch": [
+        "test.config.json"
+      ],
       "url": "./crates/rolldown_testing/test.config.scheme.json"
     }
   ],
