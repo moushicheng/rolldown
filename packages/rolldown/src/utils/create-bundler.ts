@@ -20,5 +20,5 @@ export async function createBundler(
     normalizedInputOptions,
     inputOptions,
   )
-  return new Bundler(bindingInputOptions, normalizeOutputOptions(outputOptions))
+  return new Bundler(bindingInputOptions, normalizeOutputOptions(outputOptions)) // MARK: 进入Rust的入口
 }
