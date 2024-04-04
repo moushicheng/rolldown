@@ -14,7 +14,7 @@ export async function createBundler(
   outputOptions: OutputOptions,
 ): Promise<Bundler> {
   // Convert `InputOptions` to `NormalizedInputOptions`.
-  const normalizedInputOptions = await normalizeInputOptions(inputOptions)
+  const normalizedInputOptions = await normalizeInputOptions(inputOptions) // MARK: 为什么这些处理不能放在rust里处理？感觉不合理。。。
   // Convert `NormalizedInputOptions` to `BindingInputOptions`
   const bindingInputOptions = createInputOptionsAdapter(
     normalizedInputOptions,

@@ -24,7 +24,7 @@ impl Bundler {
     input_options: BindingInputOptions,
     output_options: BindingOutputOptions,
   ) -> napi::Result<Self> {
-    // MARK: 梦开始的地方
+    // MARK: 进入Rust的入口
     try_init_custom_trace_subscriber(env);
     let ret = normalize_binding_options(input_options, output_options)?;
 

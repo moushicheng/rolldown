@@ -4,8 +4,21 @@ const bundle = await rolldown({
   input: 'app.js',
   plugins: [
     {
-      buildStart: (...params) => {
-        console.log('build start', params);
+      name: 'test1',
+      buildStart: {
+        order: 'post',
+        handler: () => {
+          console.log('test1');
+        }
+      }
+    },
+    {
+      name: 'pre',
+      buildStart: {
+        order: 'pre',
+        handler: () => {
+          console.log('test2');
+        }
       }
     }
   ]
