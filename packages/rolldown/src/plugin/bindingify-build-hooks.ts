@@ -1,8 +1,9 @@
 import { normalizeHook } from '../utils/normalize-hook'
-import type { BindingPluginOptions } from '../binding'
+import type { BindingPluginOptions, HookOption } from '../binding'
 
-import type { Plugin } from './index'
+import type { Hook, Plugin } from './index'
 import { RolldownNormalizedInputOptions } from '../options/input-options'
+import { AnyFn } from 'src/types/utils'
 
 export function bindingifyBuildStart(
   options: RolldownNormalizedInputOptions,
@@ -11,10 +12,14 @@ export function bindingifyBuildStart(
   if (!hook) {
     return undefined
   }
-  const [handler, _optionsIgnoredSofar] = normalizeHook(hook)
+  const [handler, option] = normalizeHook<Hook<AnyFn, HookOption>>(hook)
 
-  return async (ctx) => {
-    handler.call(ctx, options)
+  return {
+    handler: async (ctx) => {
+      handler.call(ctx, options)
+    },
+    order: option.order,
+    sequential: option.sequential,
   }
 }
 
@@ -24,14 +29,17 @@ export function bindingifyBuildEnd(
   if (!hook) {
     return undefined
   }
-  const [handler, _optionsIgnoredSofar] = normalizeHook(hook)
+  const [handler, option] = normalizeHook<Hook<AnyFn, HookOption>>(hook)
 
-  return async (err) => {
-    try {
-      handler.call(null, err ?? undefined)
-    } catch (error) {
-      console.error(error)
-    }
+  return {
+    handler: async (err) => {
+      try {
+        handler.call(null, err ?? undefined)
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    order: option.order,
   }
 }
 
@@ -41,24 +49,27 @@ export function bindingifyResolveId(
   if (!hook) {
     return undefined
   }
-  const [handler, _optionsIgnoredSofar] = normalizeHook(hook)
+  const [handler, option] = normalizeHook<Hook<AnyFn, HookOption>>(hook)
 
-  return async (specifier, importer, options) => {
-    const ret = await handler.call(
-      null,
-      specifier,
-      importer ?? undefined,
-      options,
-    )
-    if (ret == false || ret == null) {
-      return
-    }
-    if (typeof ret === 'string') {
-      return {
-        id: ret,
+  return {
+    handler: async (specifier, importer, options) => {
+      const ret = await handler.call(
+        null,
+        specifier,
+        importer ?? undefined,
+        options,
+      )
+      if (ret == false || ret == null) {
+        return
       }
-    }
-    return ret
+      if (typeof ret === 'string') {
+        return {
+          id: ret,
+        }
+      }
+      return ret
+    },
+    order: option.order,
   }
 }
 
@@ -68,22 +79,25 @@ export function bindingifyTransform(
   if (!hook) {
     return undefined
   }
-  const [handler, _optionsIgnoredSofar] = normalizeHook(hook)
+  const [handler, option] = normalizeHook<Hook<AnyFn, HookOption>>(hook)
 
-  return async (code, id) => {
-    const ret = await handler.call(null, code, id)
+  return {
+    handler: async (code, id) => {
+      const ret = await handler.call(null, code, id)
 
-    if (ret == null) {
-      return
-    }
+      if (ret == null) {
+        return
+      }
 
-    const retCode = typeof ret === 'string' ? ret : ret.code
-    const retMap = typeof ret === 'string' ? undefined : ret.map
+      const retCode = typeof ret === 'string' ? ret : ret.code
+      const retMap = typeof ret === 'string' ? undefined : ret.map
 
-    return {
-      code: retCode,
-      map: retMap ?? undefined,
-    }
+      return {
+        code: retCode,
+        map: retMap ?? undefined,
+      }
+    },
+    order: option.order,
   }
 }
 
@@ -93,22 +107,25 @@ export function bindingifyLoad(
   if (!hook) {
     return undefined
   }
-  const [handler, _optionsIgnoredSofar] = normalizeHook(hook)
+  const [handler, option] = normalizeHook<Hook<AnyFn, HookOption>>(hook)
 
-  return async (id) => {
-    const ret = await handler.call(null, id)
+  return {
+    handler: async (id) => {
+      const ret = await handler.call(null, id)
 
-    if (ret == null) {
-      return
-    }
+      if (ret == null) {
+        return
+      }
 
-    const retCode = typeof ret === 'string' ? ret : ret.code
-    const retMap = typeof ret === 'string' ? undefined : ret.map
+      const retCode = typeof ret === 'string' ? ret : ret.code
+      const retMap = typeof ret === 'string' ? undefined : ret.map
 
-    return {
-      code: retCode,
-      map: retMap ?? undefined,
-    }
+      return {
+        code: retCode,
+        map: retMap ?? undefined,
+      }
+    },
+    order: option.order,
   }
 }
 
@@ -118,17 +135,20 @@ export function bindingifyRenderChunk(
   if (!hook) {
     return undefined
   }
-  const [handler, _optionsIgnoredSofar] = normalizeHook(hook)
+  const [handler, option] = normalizeHook<Hook<AnyFn, HookOption>>(hook)
 
-  return async (code, chunk) => {
-    const ret = await handler.call(null, code, chunk)
+  return {
+    handler: async (code, chunk) => {
+      const ret = await handler.call(null, code, chunk)
 
-    if (ret == null) {
-      return
-    }
+      if (ret == null) {
+        return
+      }
 
-    return {
-      code: ret,
-    }
+      return {
+        code: ret,
+      }
+    },
+    order: option.order,
   }
 }

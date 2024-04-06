@@ -25,11 +25,18 @@ export class BindingOutputs {
 }
 
 export class BindingPluginContext {
-  resolve(specifier: string, importer: string | undefined | null, extraOptions: BindingPluginContextResolveOptions): void
+  resolve(
+    specifier: string,
+    importer: string | undefined | null,
+    extraOptions: BindingPluginContextResolveOptions,
+  ): void
 }
 
 export class Bundler {
-  constructor(inputOptions: BindingInputOptions, outputOptions: BindingOutputOptions)
+  constructor(
+    inputOptions: BindingInputOptions,
+    outputOptions: BindingOutputOptions,
+  )
   write(): Promise<BindingOutputs>
   generate(): Promise<BindingOutputs>
   scan(): Promise<void>
@@ -60,7 +67,13 @@ export interface BindingInputItem {
 }
 
 export interface BindingInputOptions {
-  external?: undefined | ((source: string, importer: string | undefined, isResolved: boolean) => boolean)
+  external?:
+    | undefined
+    | ((
+        source: string,
+        importer: string | undefined,
+        isResolved: boolean,
+      ) => boolean)
   input: Array<BindingInputItem>
   plugins: Array<BindingPluginOptions>
   resolve?: BindingResolveOptions
@@ -70,10 +83,14 @@ export interface BindingInputOptions {
 export interface BindingOutputOptions {
   entryFileNames?: string
   chunkFileNames?: string
-  banner?: Nullable<string> | ((chunk: RenderedChunk) => MaybePromise<VoidNullable<string>>)
+  banner?:
+    | Nullable<string>
+    | ((chunk: RenderedChunk) => MaybePromise<VoidNullable<string>>)
   dir?: string
   exports?: 'default' | 'named' | 'none' | 'auto'
-  footer?: Nullable<string> | ((chunk: RenderedChunk) => MaybePromise<VoidNullable<string>>)
+  footer?:
+    | Nullable<string>
+    | ((chunk: RenderedChunk) => MaybePromise<VoidNullable<string>>)
   format?: 'es' | 'cjs'
   plugins: Array<BindingPluginOptions>
   sourcemap?: 'file' | 'inline' | 'hidden'
@@ -85,14 +102,14 @@ export interface BindingPluginContextResolveOptions {
 
 export interface BindingPluginOptions {
   name: string
-  buildStart?: (ctx: BindingPluginContext) => MaybePromise<VoidNullable>
-  resolveId?: (specifier: string, importer: Nullable<string>, options: BindingHookResolveIdExtraOptions) => MaybePromise<VoidNullable<BindingHookResolveIdOutput>>
-  load?: (id: string) => MaybePromise<VoidNullable<BindingHookLoadOutput>>
-  transform?: (id: string, code: string) => MaybePromise<VoidNullable<BindingHookLoadOutput>>
-  buildEnd?: (error: Nullable<string>) => MaybePromise<VoidNullable>
-  renderChunk?: (code: string, chunk: RenderedChunk) => MaybePromise<VoidNullable<BindingHookRenderChunkOutput>>
-  generateBundle?: (bundle: BindingOutputs, isWrite: boolean) => MaybePromise<VoidNullable>
-  writeBundle?: (bundle: BindingOutputs) => MaybePromise<VoidNullable>
+  buildStart?: BuildStartHookOption
+  resolveId?: ResolveIdHookOption
+  load?: LoadOption
+  transform?: TransformOption
+  buildEnd?: BuildEndHookOption
+  renderChunk?: RenderChunkOption
+  generateBundle?: GenerateBundleOption
+  writeBundle?: WriteBundleOption
 }
 
 export interface BindingRenderedModule {
@@ -111,6 +128,44 @@ export interface BindingResolveOptions {
   symlinks?: boolean
 }
 
+export interface BuildEndHookOption {
+  handler: (error: Nullable<string>) => MaybePromise<VoidNullable>
+  order?: 'pre' | 'post' | null
+  sequential?: boolean
+}
+
+export interface BuildStartHookOption {
+  handler: (ctx: BindingPluginContext) => MaybePromise<VoidNullable>
+  order?: 'pre' | 'post' | null
+  sequential?: boolean
+}
+
+export interface GenerateBundleOption {
+  handler: (
+    bundle: BindingOutputs,
+    isWrite: boolean,
+  ) => MaybePromise<VoidNullable>
+  order?: 'pre' | 'post' | null
+}
+
+export interface HookOption {
+  order?: 'pre' | 'post' | null
+  sequential?: boolean
+}
+
+export interface LoadOption {
+  handler: (id: string) => MaybePromise<VoidNullable<BindingHookLoadOutput>>
+  order?: 'pre' | 'post' | null
+}
+
+export interface RenderChunkOption {
+  handler: (
+    code: string,
+    chunk: RenderedChunk,
+  ) => MaybePromise<VoidNullable<BindingHookRenderChunkOutput>>
+  order?: 'pre' | 'post' | null
+}
+
 export interface RenderedChunk {
   isEntry: boolean
   isDynamicEntry: boolean
@@ -121,3 +176,25 @@ export interface RenderedChunk {
   modules: Record<string, BindingRenderedModule>
 }
 
+export interface ResolveIdHookOption {
+  handler: (
+    specifier: string,
+    importer: Nullable<string>,
+    options: BindingHookResolveIdExtraOptions,
+  ) => MaybePromise<VoidNullable<BindingHookResolveIdOutput>>
+  order?: 'pre' | 'post' | null
+}
+
+export interface TransformOption {
+  handler: (
+    id: string,
+    code: string,
+  ) => MaybePromise<VoidNullable<BindingHookLoadOutput>>
+  order?: 'pre' | 'post' | null
+}
+
+export interface WriteBundleOption {
+  handler: (bundle: BindingOutputs) => MaybePromise<VoidNullable>
+  order?: 'pre' | 'post' | null
+  sequential?: boolean
+}
