@@ -112,13 +112,13 @@ impl<'a> LinkStage<'a> {
   }
 
   pub fn link(mut self) -> LinkStageOutput {
-    tracing::info!("Start link stage");
+    // tracing::info!("Start link stage");
     self.sort_modules();
 
     self.determine_module_exports_kind();
     self.wrap_modules();
     self.bind_imports_and_exports();
-    tracing::debug!("linking modules {:#?}", self.metas);
+    // tracing::debug!("linking modules {:#?}", self.metas);
     self.create_exports_for_modules();
     self.reference_needed_symbols();
     self.include_statements();

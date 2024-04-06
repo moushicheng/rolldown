@@ -49,7 +49,7 @@ impl ScanStage {
 
   #[tracing::instrument(skip_all)]
   pub async fn scan(&self) -> BatchedResult<ScanStageOutput> {
-    tracing::info!("Start scan stage");
+    // tracing::info!("Start scan stage");
     assert!(!self.input_options.input.is_empty(), "You must supply options.input to rolldown");
 
     let mut module_loader = ModuleLoader::new(
@@ -66,7 +66,7 @@ impl ScanStage {
     let ModuleLoaderOutput { module_table, entry_points, symbols, runtime, warnings, ast_table } =
       module_loader.fetch_all_modules(user_entries).await?;
 
-    tracing::debug!("Scan stage finished {module_table:#?}");
+    // tracing::debug!("Scan stage finished {module_table:#?}");
 
     Ok(ScanStageOutput { module_table, entry_points, symbols, runtime, warnings, ast_table })
   }

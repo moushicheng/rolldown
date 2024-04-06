@@ -145,8 +145,8 @@ impl Bundler {
 
   #[tracing::instrument(skip_all)]
   async fn bundle_up(&mut self, is_write: bool) -> BatchedResult<RolldownOutput> {
-    tracing::trace!("InputOptions {:#?}", self.input_options);
-    tracing::trace!("OutputOptions: {:#?}", self.output_options);
+    // tracing::trace!("InputOptions {:#?}", self.input_options);
+    // tracing::trace!("OutputOptions: {:#?}", self.output_options);
     let mut link_stage_output = self.try_build().await?;
 
     let mut bundle_stage = BundleStage::new(

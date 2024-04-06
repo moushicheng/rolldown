@@ -56,7 +56,7 @@ impl<'task> NormalModuleTask<'task> {
   }
 
   async fn run_inner(&mut self) -> anyhow::Result<()> {
-    tracing::trace!("process {:?}", self.resolved_path);
+    // tracing::trace!("process {:?}", self.resolved_path);
 
     let mut sourcemap_chain = vec![];
     let mut warnings = vec![];
@@ -94,7 +94,7 @@ impl<'task> NormalModuleTask<'task> {
     };
 
     let (ast, scope, scan_result, ast_symbol, namespace_symbol) = self.scan(&source);
-    tracing::trace!("scan {:?}", self.resolved_path);
+    // tracing::trace!("scan {:?}", self.resolved_path);
 
     let res = self.resolve_dependencies(&scan_result.import_records).await?;
 
@@ -145,7 +145,7 @@ impl<'task> NormalModuleTask<'task> {
         ast,
       }))
       .expect("Send should not fail");
-    tracing::trace!("end process {:?}", self.resolved_path);
+    // tracing::trace!("end process {:?}", self.resolved_path);
     Ok(())
   }
 

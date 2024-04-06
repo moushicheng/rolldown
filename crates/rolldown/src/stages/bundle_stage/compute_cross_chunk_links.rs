@@ -29,7 +29,7 @@ impl<'a> BundleStage<'a> {
     chunk_meta_imports_from_external_modules: &mut ChunkMetaImportsForExternalModules,
   ) {
     let symbols = &Mutex::new(&mut self.link_output.symbols);
-    tracing::info!("collect_potential_chunk_imports");
+    // tracing::info!("collect_potential_chunk_imports");
     chunk_graph
       .chunks
       .iter_enumerated()
@@ -108,7 +108,7 @@ impl<'a> BundleStage<'a> {
           }
         }
       });
-    tracing::info!("collect_potential_chunk_imports end");
+    // tracing::info!("collect_potential_chunk_imports end");
   }
 
   pub fn compute_cross_chunk_links(&mut self, chunk_graph: &mut ChunkGraph) {
@@ -129,7 +129,7 @@ impl<'a> BundleStage<'a> {
       &mut chunk_meta_imports_from_external_modules_vec,
     );
 
-    tracing::info!("calculate cross chunk imports");
+    // tracing::info!("calculate cross chunk imports");
     // - Find out what imports are actually come from other chunks
     chunk_graph.chunks.iter_enumerated().for_each(|(chunk_id, chunk)| {
       let chunk_meta_imports = &chunk_meta_imports_vec[chunk_id];
@@ -177,7 +177,7 @@ impl<'a> BundleStage<'a> {
       }
     });
 
-    tracing::info!("Generate cross-chunk exports");
+    // tracing::info!("Generate cross-chunk exports");
     // Generate cross-chunk exports. These must be computed before cross-chunk
     // imports because of export alias renaming, which must consider all export
     // aliases simultaneously to avoid collisions.

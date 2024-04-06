@@ -35,7 +35,7 @@ impl RuntimeNormalModuleTask {
 
   #[tracing::instrument(skip_all)]
   pub fn run(self) {
-    tracing::trace!("process <runtime>");
+    // tracing::trace!("process <runtime>");
     let mut builder = NormalModuleBuilder::default();
 
     let source: Arc<str> =

@@ -41,14 +41,14 @@ impl<'a> BundleStage<'a> {
   #[tracing::instrument(skip_all)]
   pub async fn bundle(&mut self) -> BatchedResult<Vec<Output>> {
     use rayon::prelude::*;
-    tracing::info!("Start bundle stage");
+    // tracing::info!("Start bundle stage");
     let mut chunk_graph = self.generate_chunks();
 
     self.generate_chunk_filenames(&mut chunk_graph);
-    tracing::info!("generate_chunk_filenames");
+    // tracing::info!("generate_chunk_filenames");
 
     self.compute_cross_chunk_links(&mut chunk_graph);
-    tracing::info!("compute_cross_chunk_links");
+    // tracing::info!("compute_cross_chunk_links");
 
     chunk_graph.chunks.iter_mut().par_bridge().for_each(|chunk| {
       chunk.de_conflict(self.link_output);
@@ -81,7 +81,7 @@ impl<'a> BundleStage<'a> {
           ast,
         );
       });
-    tracing::info!("finalizing modules");
+    // tracing::info!("finalizing modules");
 
     let chunks = block_on_spawn_all(chunk_graph.chunks.iter().map(|c| async {
       c.render(self.input_options, self.link_output, &chunk_graph, self.output_options).await
@@ -129,7 +129,7 @@ impl<'a> BundleStage<'a> {
       },
     )?;
 
-    tracing::info!("rendered chunks");
+    // tracing::info!("rendered chunks");
 
     Ok(assets)
   }

@@ -14,10 +14,10 @@ use tracing_subscriber::{fmt, prelude::*};
 static IS_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 pub fn try_init_tracing() {
-  if std::env::var("LOG").is_err() {
-    // tracing will slow down the bundling process, so we only enable it when `LOG` is set.
-    return;
-  }
+  // if std::env::var("LOG").is_err() {
+  //   // tracing will slow down the bundling process, so we only enable it when `LOG` is set.
+  //   return;
+  // }
   if !IS_INITIALIZED.swap(true, std::sync::atomic::Ordering::SeqCst) {
     tracing_subscriber::registry()
       .with(
@@ -32,7 +32,7 @@ pub fn try_init_tracing() {
       )
       .with(fmt::layer().pretty().without_time())
       .init();
-    tracing::trace!("Tracing is initialized.");
+    // tracing::trace!("Tracing is initialized.");
   }
 }
 

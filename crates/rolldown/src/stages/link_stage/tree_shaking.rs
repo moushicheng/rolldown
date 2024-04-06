@@ -119,14 +119,14 @@ impl LinkStage<'_> {
       });
     });
 
-    tracing::trace!(
-      "included statements {:#?}",
-      self
-        .module_table
-        .normal_modules
-        .iter()
-        .map(NormalModule::to_debug_normal_module_for_tree_shaking)
-        .collect::<Vec<_>>()
-    );
+    // tracing::trace!(
+    //   "included statements {:#?}",
+    //   self
+    //     .module_table
+    //     .normal_modules
+    //     .iter()
+    //     .map(NormalModule::to_debug_normal_module_for_tree_shaking)
+    //     .collect::<Vec<_>>()
+    // );
   }
 }
