@@ -1,11 +1,10 @@
-use std::any::type_name;
-
 use futures::Future;
 use napi::{
-  bindgen_prelude::{FromNapiValue, Promise},
+  bindgen_prelude::{FromNapiValue, JsValuesTupleIntoVec, Promise},
   threadsafe_function::{ThreadsafeFunction, UnknownReturnValue},
   Either,
 };
+use rolldown_utils::debug::pretty_type_name;
 
 /// `JsCallback`  is a type alias for `ThreadsafeFunction`. It represents a JavaScript function that passed to Rust side.
 /// Related concepts are complex, so we use `JsCallback` to simplify the mental model. For details, please refer to:
@@ -66,11 +65,12 @@ use napi::{
 /// - Rust(Simplified): `MaybeAsyncJsCallback<(Option<String>, i32), Option<i32>>`
 /// - Js: `(a: string | null | undefined, b: number) => Promise<number | null | undefined | void> | number | null | undefined | void`
 /// - Js(Simplified): `(a: Nullable<string>, b: number) => MaybePromise<VoidNullable<number>>`
-pub type JsCallback<Args, Ret> = ThreadsafeFunction<Args, Either<Ret, UnknownReturnValue>, false>;
+pub type JsCallback<Args, Ret> =
+  ThreadsafeFunction<Args, Either<Ret, UnknownReturnValue>, Args, false>;
 
 /// Shortcut for `JsCallback<..., Either<Promise<Ret>, Ret>>`, which could be simplified to `MaybeAsyncJsCallback<..., Ret>`.
 pub type MaybeAsyncJsCallback<Args, Ret> =
-  ThreadsafeFunction<Args, Either<Either<Promise<Ret>, Ret>, UnknownReturnValue>, false>;
+  ThreadsafeFunction<Args, Either<Either<Promise<Ret>, Ret>, UnknownReturnValue>, Args, false>;
 
 pub trait MaybeAsyncJsCallbackExt<Args, Ret> {
   /// Call Js function asynchronously in rust. If the Js function returns `Promise<T>`, it will unwrap/await the promise and return `T`.
@@ -79,7 +79,7 @@ pub trait MaybeAsyncJsCallbackExt<Args, Ret> {
 
 impl<Args, Ret> MaybeAsyncJsCallbackExt<Args, Ret> for JsCallback<Args, Either<Promise<Ret>, Ret>>
 where
-  Args: 'static + Send,
+  Args: 'static + Send + JsValuesTupleIntoVec,
   Ret: 'static + Send + FromNapiValue,
   napi::Either<napi::Either<Promise<Ret>, Ret>, UnknownReturnValue>: FromNapiValue,
 {
@@ -89,10 +89,19 @@ where
       match self.call_async(args).await? {
         Either::A(Either::A(promise)) => promise.await,
         Either::A(Either::B(ret)) => Ok(ret),
-        Either::B(_unknown) => Err(napi::Error::new(
-          napi::Status::InvalidArg,
-          format!("Unknown return value. Cannot convert to `{}`.", type_name::<Ret>()),
-        )),
+        Either::B(_unknown) => {
+          // TODO: should provide more information about the unknown return value
+          let js_type = "unknown";
+          let expected_rust_type = pretty_type_name::<Ret>();
+
+          Err(napi::Error::new(
+            napi::Status::InvalidArg,
+            format!(
+              "UNKNOWN_RETURN_VALUE. Cannot convert {js_type} to `{expected_rust_type}` in {}.",
+              pretty_type_name::<Self>(),
+            ),
+          ))
+        }
       }
     }
   }

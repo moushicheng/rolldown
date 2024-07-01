@@ -8,34 +8,34 @@ input_file: crates/rolldown/tests/esbuild/splitting/hybrid_esm_and_cjs_issue617
 ## a.mjs
 
 ```js
-import { foo } from "./a_js.mjs";
+import { foo, init_a } from "./a~1.mjs";
 
+init_a();
 export { foo };
 ```
-## a_js.mjs
+## a~1.mjs
 
 ```js
-import { __esmMin, __export } from "./$runtime$.mjs";
 
-// a.js
+
+//#region a.js
 var a_ns, foo;
 var init_a = __esmMin(() => {
 	a_ns = {};
-	__export(a_ns, {
-		foo:() => foo
-	});
+	__export(a_ns, {foo: () => foo});
 });
 
-export { a_ns, foo, init_a };
+//#endregion
+export { __toCommonJS, a_ns, foo, init_a };
 ```
 ## b.mjs
 
 ```js
-import { __toCommonJS } from "./$runtime$.mjs";
-import { a_ns, init_a } from "./a_js.mjs";
+import { __toCommonJS, a_ns, init_a } from "./a~1.mjs";
 
-// b.js
-let bar = (init_a(),__toCommonJS(a_ns));
+//#region b.js
+let bar = (init_a(), __toCommonJS(a_ns));
 
+//#endregion
 export { bar };
 ```

@@ -8,28 +8,36 @@ input_file: crates/rolldown/tests/esbuild/splitting/assign-to-local
 ## a.mjs
 
 ```js
-import { foo, setFoo } from "./shared_js.mjs";
+import { foo, setFoo } from "./shared.mjs";
+import { default as assert } from "node:assert";
 
-// a.js
+//#region a.js
 setFoo(123);
-console.log(foo);
+assert.equal(foo, 123);
+
+//#endregion
 ```
 ## b.mjs
 
 ```js
-import { foo } from "./shared_js.mjs";
+import { foo } from "./shared.mjs";
+import { default as assert } from "node:assert";
 
-// b.js
-console.log(foo);
+//#region b.js
+assert.equal(foo, 123);
+
+//#endregion
 ```
-## shared_js.mjs
+## shared.mjs
 
 ```js
-// shared.js
+
+//#region shared.js
 let foo;
 function setFoo(value) {
 	foo = value;
 }
 
+//#endregion
 export { foo, setFoo };
 ```

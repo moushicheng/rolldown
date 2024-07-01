@@ -1,0 +1,20 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/packagejson/test_package_json_imports_error_unsupported_directory_import
+---
+# Assets
+
+## entry.mjs
+
+```js
+
+//#region foo1/bar/index.js
+console.log(bar);
+
+//#endregion
+//#region foo2/bar/index.js
+console.log(bar);
+
+//#endregion
+```

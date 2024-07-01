@@ -1,8 +1,11 @@
-import type { SourceMapInput } from '../rollup-types'
-
-export function transformSourcemap(value?: SourceMapInput): string | undefined {
-  if (typeof value === 'object') {
-    return JSON.stringify(value)
+export function isEmptySourcemapFiled(
+  array: undefined | (string | null)[],
+): boolean {
+  if (!array) {
+    return true
   }
-  return value
+  if (array.length === 0 || !array[0] /* null or '' */) {
+    return true
+  }
+  return false
 }

@@ -8,15 +8,18 @@ input_file: crates/rolldown/tests/esbuild/import_star/re_export_namespace_import
 ## entry_js.mjs
 
 ```js
-import { __export } from "./$runtime$.mjs";
+import { default as assert } from "node:assert";
 
-// bar.js
+
+//#region bar.js
 var bar_ns = {};
-__export(bar_ns, {
-	x:() => x
-});
+__export(bar_ns, {x: () => x});
 const x = 123;
 
-// entry.js
-console.log(bar_ns, bar_ns.foo);
+//#endregion
+//#region entry.js
+assert.deepEqual(bar_ns, {x: 123});
+assert.equal(bar_ns.foo, undefined);
+
+//#endregion
 ```

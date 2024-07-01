@@ -10,14 +10,12 @@ input_file: crates/rolldown/tests/fixtures/rollup/object-spread-side-effect
 ```js
 import { default as assert } from "assert";
 
-// main.js
+//#region main.js
 let result = 'FAIL';
-const unused = {
-	...{
-		get prop(){
-			result = 'PASS';
-		}
-	}
-};
+const unused = {...{get prop() {
+	result = 'PASS';
+}}};
 assert.strictEqual(result, 'PASS');
+
+//#endregion
 ```

@@ -1,0 +1,22 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/fixtures/function/resolve/browser_filed_false
+---
+# Assets
+
+## package.mjs
+
+```js
+
+
+//#region (ignored) node_modules/package/util.js
+var require_util = __commonJSMin((exports, module) => {});
+
+//#endregion
+//#region node_modules/package/index.js
+var import_util = __toESM(require_util());
+console.log(import_util.default);
+
+//#endregion
+```

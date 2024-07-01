@@ -9,66 +9,70 @@ input_file: crates/rolldown/tests/fixtures/deconflict/wrapped_esm_export_named_f
 
 ```js
 import { default as assert } from "assert";
-import { __esmMin, __export, __toCommonJS } from "./$runtime$.mjs";
 
-// foo.js
+
+//#region foo.js
 function foo$1(a$1$1) {
 	console.log(a$1$1, a$1);
 }
 var foo_ns, a$1;
 var init_foo = __esmMin(() => {
 	foo_ns = {};
-	__export(foo_ns, {
-		foo:() => foo$1
-	});
+	__export(foo_ns, {foo: () => foo$1});
 	a$1 = 1;
 });
 
-// bar.js
+//#endregion
+//#region bar.js
 init_foo();
-var bar_default = {
-	foo:foo$1
-};
+var bar_default = {foo: foo$1};
 
-// main.js
+//#endregion
+//#region main.js
 const a = 2;
-const {foo} = bar_default;
+const { foo } = bar_default;
 assert.strictEqual(typeof foo, 'function');
-init_foo(),__toCommonJS(foo_ns);
+init_foo(), __toCommonJS(foo_ns);
 
+//#endregion
 //# sourceMappingURL=main.mjs.map
 ```
 
 # Sourcemap Visualizer
 
-- foo.js
-(2:7-2:16) " function" --> (4:0-4:9) "\nfunction"
-(2:16-2:20) " foo" --> (4:9-4:15) " foo$1"
-(2:20-2:25) "(a$1)" --> (4:15-4:22) "(a$1$1)"
-(2:25-3:4) " {\n   " --> (4:22-5:0) " {"
-(3:4-3:12) " console" --> (5:0-5:9) "\n\tconsole"
-(3:12-3:16) ".log" --> (5:9-5:13) ".log"
-(3:16-3:21) "(a$1," --> (5:13-5:20) "(a$1$1,"
-(3:21-3:23) " a" --> (5:20-5:24) " a$1"
-(3:23-4:1) ")\n" --> (5:24-6:0) ");"
-(4:1-4:2) "}" --> (6:0-17:0) "\n}\nvar foo_ns, a$1;\nvar init_foo = __esmMin(() => {\n\tfoo_ns = {};\n\t__export(foo_ns, {\n\t\tfoo:() => foo$1\n\t});\n\ta$1 = 1;\n});\n\n// bar.js"
-- bar.js
-(0:0-2:15) "import { foo } from './foo'\n\nexport default" --> (17:0-18:18) "\ninit_foo();\nvar bar_default ="
-(2:15-2:17) " {" --> (18:18-19:1) " {\n"
-(2:17-2:22) " foo " --> (19:1-20:1) "\tfoo:foo$1\n"
-(2:22-2:23) "}" --> (20:1-23:0) "};\n\n// main.js"
-- main.js
-(3:0-3:6) "\nconst" --> (23:0-23:6) "\nconst"
-(3:6-3:10) " a =" --> (23:6-23:10) " a ="
-(3:10-5:0) " 2; // make foo `a` conflict\n" --> (23:10-24:0) " 2;"
-(5:0-5:6) "\nconst" --> (24:0-24:6) "\nconst"
-(5:6-5:8) " {" --> (24:6-24:7) " "
-(5:8-5:13) " foo " --> (24:7-24:11) "{foo"
-(5:13-5:16) "} =" --> (24:11-24:14) "} ="
-(5:16-7:0) " bar\n" --> (24:14-25:0) " bar_default;"
-(7:0-7:7) "\nassert" --> (25:0-25:7) "\nassert"
-(7:7-7:26) ".strictEqual(typeof" --> (25:7-25:26) ".strictEqual(typeof"
-(7:26-7:31) " foo," --> (25:26-25:31) " foo,"
-(7:31-7:42) " 'function'" --> (25:31-25:42) " 'function'"
-(7:42-9:0) ")\n" --> (25:42-26:0) ");"
-(9:0-9:17) "\nrequire('./foo')" --> (26:0-28:34) "\ninit_foo(),__toCommonJS(foo_ns);\n\n//# sourceMappingURL=main.mjs.map"
+- ../foo.js
+(2:7-2:16) " function" --> (28:0-28:9) "\nfunction"
+(2:16-2:20) " foo" --> (28:9-28:15) " foo$1"
+(2:20-2:25) "(a$1)" --> (28:15-28:22) "(a$1$1)"
+(2:25-3:4) " {\n   " --> (28:22-29:0) " {"
+(3:4-3:12) " console" --> (29:0-29:9) "\n\tconsole"
+(3:12-3:16) ".log" --> (29:9-29:13) ".log"
+(3:16-3:21) "(a$1," --> (29:13-29:20) "(a$1$1,"
+(3:21-3:23) " a" --> (29:20-29:24) " a$1"
+(3:23-4:1) ")\n" --> (29:24-30:0) ");"
+(4:1-0:0) "" --> (30:0-31:0) "\n}"
+(0:0-0:6) "const " --> (31:0-35:1) "\nvar foo_ns, a$1;\nvar init_foo = __esmMin(() => {\n\tfoo_ns = {};\n\t__export(foo_ns, {foo: () => foo$1});\n"
+(0:6-0:10) "a = " --> (35:1-35:7) "\ta$1 ="
+(0:10-0:0) "const a = " --> (35:7-36:0) " 1;"
+(0:0-4:2) "const a = 1;\n\nexport function foo(a$1) {\n    console.log(a$1, a)\n}" --> (36:0-40:0) "\n});\n\n//#endregion\n//#region bar.js"
+- ../bar.js
+(0:0-2:15) "import { foo } from './foo'\n\nexport default" --> (40:0-41:18) "\ninit_foo();\nvar bar_default ="
+(2:15-2:17) " {" --> (41:18-41:19) " "
+(2:17-2:22) " foo " --> (41:19-41:29) "{foo: foo$"
+(2:22-2:23) "}" --> (41:29-45:0) "1};\n\n//#endregion\n//#region main.js"
+- ../main.js
+(3:0-3:6) "\nconst" --> (45:0-45:6) "\nconst"
+(3:6-3:10) " a =" --> (45:6-45:10) " a ="
+(3:10-5:0) " 2; // make foo `a` conflict\n" --> (45:10-46:0) " 2;"
+(5:0-5:6) "\nconst" --> (46:0-46:6) "\nconst"
+(5:6-5:8) " {" --> (46:6-46:8) " {"
+(5:8-5:13) " foo " --> (46:8-46:13) " foo "
+(5:13-5:16) "} =" --> (46:13-46:16) "} ="
+(5:16-7:0) " bar\n" --> (46:16-47:0) " bar_default;"
+(7:0-7:7) "\nassert" --> (47:0-47:7) "\nassert"
+(7:7-7:26) ".strictEqual(typeof" --> (47:7-47:26) ".strictEqual(typeof"
+(7:26-7:31) " foo," --> (47:26-47:31) " foo,"
+(7:31-7:42) " 'function'" --> (47:31-47:42) " 'function'"
+(7:42-9:0) ")\n" --> (47:42-48:0) ");"
+(9:0-0:0) "" --> (48:0-48:0) ""
+(0:0-9:17) "import assert from 'assert'\nimport bar from './bar'\n\nconst a = 2; // make foo `a` conflict\n\nconst { foo } = bar\n\nassert.strictEqual(typeof foo, 'function')\n\nrequire('./foo')" --> (48:0-51:34) "\ninit_foo(), __toCommonJS(foo_ns);\n\n//#endregion\n//# sourceMappingURL=main.mjs.map"

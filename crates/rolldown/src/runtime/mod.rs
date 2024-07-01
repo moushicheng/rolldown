@@ -1,5 +1,5 @@
 use oxc::{semantic::SymbolId, span::CompactStr as CompactString};
-use rolldown_common::{AstScope, NormalModuleId, SymbolRef};
+use rolldown_common::{AstScopes, NormalModuleId, SymbolRef};
 use rustc_hash::FxHashMap;
 
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub struct RuntimeModuleBrief {
 }
 
 impl RuntimeModuleBrief {
-  pub fn new(id: NormalModuleId, scope: &AstScope) -> Self {
+  pub fn new(id: NormalModuleId, scope: &AstScopes) -> Self {
     Self {
       id,
       name_to_symbol: scope.get_bindings(scope.root_scope_id()).clone().into_iter().collect(),
@@ -26,3 +26,5 @@ impl RuntimeModuleBrief {
     (self.id, *symbol_id).into()
   }
 }
+
+pub static ROLLDOWN_RUNTIME_RESOURCE_ID: &str = "rolldown:runtime";

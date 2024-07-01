@@ -1,0 +1,16 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/dce/remove_unused_import_meta
+---
+# Assets
+
+## entry_js.mjs
+
+```js
+
+//#region entry.js
+console.log('foo is unused');
+
+//#endregion
+```

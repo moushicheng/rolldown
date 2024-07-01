@@ -1,0 +1,32 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/packagejson/test_package_json_dual_package_hazard_import_and_require_separate_files
+---
+# Assets
+
+## entry.mjs
+
+```js
+import { default as assert } from "node:assert";
+
+
+//#region node_modules/demo-pkg/module.js
+var module_ns, module_default;
+var init_module = __esmMin(() => {
+	module_ns = {};
+	__export(module_ns, {default: () => module_default});
+	module_default = 'module';
+});
+
+//#endregion
+//#region src/test-main.js
+console.log((init_module(), __toCommonJS(module_ns)));
+
+//#endregion
+//#region src/test-module.js
+init_module();
+assert.equal(module_default, 'module');
+
+//#endregion
+```

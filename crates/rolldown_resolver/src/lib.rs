@@ -1,10 +1,8 @@
 // An wrapper around the `oxc_resolver` crate to provide a more rolldown-specific API.
 
 mod resolver;
-mod types;
 
-pub use crate::{
-  resolver::{ResolveRet, Resolver},
-  types::{module_type::ModuleType, resolved_path::ResolvedPath},
-};
-pub use oxc_resolver::{Alias, AliasValue, EnforceExtension, ResolveOptions};
+pub use crate::resolver::{ResolveReturn, Resolver};
+
+pub use oxc_resolver::ResolveError;
+pub use rolldown_common::bundler_options::ResolveOptions;

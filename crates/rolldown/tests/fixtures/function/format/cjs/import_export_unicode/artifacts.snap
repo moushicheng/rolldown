@@ -1,0 +1,25 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/fixtures/function/format/cjs/import_export_unicode
+---
+# Assets
+
+## main.cjs
+
+```js
+"use strict";
+
+
+
+//#region foo.js
+const devil = 'devil';
+
+//#endregion
+//#region main.js
+var main_ns = {};
+__export(main_ns, {'😈': () => devil});
+
+//#endregion
+module.exports = __toCommonJS(main_ns)
+```

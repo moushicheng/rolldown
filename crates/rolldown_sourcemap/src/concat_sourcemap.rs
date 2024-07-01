@@ -1,9 +1,12 @@
 // cSpell:disable
 use oxc::sourcemap::{ConcatSourceMapBuilder, SourceMap};
 
+use crate::lines_count;
+
 pub trait Source {
   fn sourcemap(&self) -> Option<&SourceMap>;
   fn content(&self) -> &String;
+  fn lines_count(&self) -> u32;
   #[allow(clippy::wrong_self_convention)]
   fn into_concat_source(
     &self,
@@ -32,6 +35,10 @@ impl Source for RawSource {
     &self.content
   }
 
+  fn lines_count(&self) -> u32 {
+    lines_count(&self.content)
+  }
+
   fn into_concat_source(
     &self,
     final_source: &mut String,
@@ -45,11 +52,12 @@ impl Source for RawSource {
 pub struct SourceMapSource {
   content: String,
   sourcemap: SourceMap,
+  lines_count: u32,
 }
 
 impl SourceMapSource {
-  pub fn new(content: String, sourcemap: SourceMap) -> Self {
-    Self { content, sourcemap }
+  pub fn new(content: String, sourcemap: SourceMap, lines_count: u32) -> Self {
+    Self { content, sourcemap, lines_count }
   }
 }
 
@@ -62,7 +70,10 @@ impl Source for SourceMapSource {
     &self.content
   }
 
-  #[allow(clippy::cast_possible_truncation)]
+  fn lines_count(&self) -> u32 {
+    self.lines_count
+  }
+
   fn into_concat_source(
     &self,
     final_source: &mut String,
@@ -99,7 +110,6 @@ impl ConcatSource {
     self.prepend_source.push(source);
   }
 
-  #[allow(clippy::cast_possible_truncation)]
   pub fn content_and_sourcemap(self) -> (String, Option<SourceMap>) {
     let mut final_source = String::new();
     let mut sourcemap_builder = self.enable_sourcemap.then_some(ConcatSourceMapBuilder::default());
@@ -110,7 +120,7 @@ impl ConcatSource {
       source.into_concat_source(&mut final_source, &mut sourcemap_builder, line_offset);
       if index < source_len - 1 {
         final_source.push('\n');
-        line_offset += source.content().matches('\n').count() as u32 + 1; // +1 for the newline
+        line_offset += source.lines_count() + 1; // +1 for the newline
       }
     }
 
@@ -141,12 +151,12 @@ mod tests {
           "names":[]
         }"#
     )
-    .unwrap(),
+    .unwrap().into(),3
     )));
 
     let (content, map) = {
       let (content, map) = concat_source.content_and_sourcemap();
-      (content, map.expect("should have sourcemap").to_json_string())
+      (content, map.expect("should have sourcemap").to_json_string().unwrap())
     };
 
     assert_eq!(

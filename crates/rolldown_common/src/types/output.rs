@@ -1,31 +1,29 @@
-use std::sync::Arc;
+use crate::{AssetSource, OutputChunk};
 
-use crate::OutputChunk;
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct OutputAsset {
-  pub file_name: String,
-  pub source: String,
+  pub filename: String,
+  pub source: AssetSource,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Output {
-  Chunk(Arc<OutputChunk>),
-  Asset(Arc<OutputAsset>),
+  Chunk(Box<OutputChunk>),
+  Asset(Box<OutputAsset>),
 }
 
 impl Output {
-  pub fn file_name(&self) -> &str {
+  pub fn filename(&self) -> &str {
     match self {
-      Self::Chunk(chunk) => &chunk.file_name,
-      Self::Asset(asset) => &asset.file_name,
+      Self::Chunk(chunk) => &chunk.filename,
+      Self::Asset(asset) => &asset.filename,
     }
   }
 
-  pub fn content(&self) -> &str {
+  pub fn content_as_bytes(&self) -> &[u8] {
     match self {
-      Self::Chunk(chunk) => &chunk.code,
-      Self::Asset(asset) => &asset.source,
+      Self::Chunk(chunk) => chunk.code.as_bytes(),
+      Self::Asset(asset) => asset.source.as_bytes(),
     }
   }
 }

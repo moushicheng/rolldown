@@ -1,0 +1,21 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/lower/lower_async_this2016_es6
+---
+# Assets
+
+## entry_js.mjs
+
+```js
+
+//#region other.js
+let bar = async () => {};
+
+//#endregion
+//#region entry.js
+let foo = async () => this;
+
+//#endregion
+export { bar, foo };
+```

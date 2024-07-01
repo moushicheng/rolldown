@@ -1,0 +1,23 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/lower/lower_private_class_accessor_order
+---
+# Assets
+
+## entry_js.mjs
+
+```js
+import { default as assert } from "node:assert";
+
+//#region entry.js
+class Foo {
+	bar = this.#foo;
+	get #foo() {
+		return 123;
+	}
+}
+assert(new Foo().bar === 123);
+
+//#endregion
+```

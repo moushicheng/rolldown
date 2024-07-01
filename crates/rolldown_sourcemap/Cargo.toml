@@ -18,6 +18,5 @@ doctest = false
 test    = false
 
 [dependencies]
-oxc            = { workspace = true }
-rolldown_error = { path = "../rolldown_error" }
-rustc-hash     = { workspace = true }
+memchr = { workspace = true }
+oxc    = { workspace = true }

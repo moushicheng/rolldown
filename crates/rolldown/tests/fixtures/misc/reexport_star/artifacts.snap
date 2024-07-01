@@ -1,0 +1,34 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/fixtures/misc/reexport_star
+---
+# Assets
+
+## a.mjs
+
+```js
+
+
+//#region a.js
+var a_ns = {};
+__export(a_ns, {abc: () => abc});
+const abc = undefined;
+
+//#endregion
+export { a_ns };
+```
+## entry.mjs
+
+```js
+import { a_ns } from "./a.mjs";
+
+export { a_ns as a };
+```
+## main.mjs
+
+```js
+import { a_ns } from "./a.mjs";
+
+export { a_ns as a };
+```

@@ -8,14 +8,17 @@ input_file: crates/rolldown/tests/esbuild/default/use_strict_directive_bundle_is
 ## entry_js.mjs
 
 ```js
-import { __commonJSMin } from "./$runtime$.mjs";
+import { default as assert } from "node:assert";
 
-// cjs.js
-'use strict';
+
+//#region cjs.js
 var require_cjs = __commonJSMin((exports, module) => {
 	exports.foo = process;
 });
 
-// entry.js
-console.log(require_cjs());
+//#endregion
+//#region entry.js
+assert.deepEqual(require_cjs(), {foo: process});
+
+//#endregion
 ```

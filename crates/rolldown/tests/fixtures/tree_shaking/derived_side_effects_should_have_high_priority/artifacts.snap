@@ -1,0 +1,20 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/fixtures/tree_shaking/derived_side_effects_should_have_high_priority
+---
+# Assets
+
+## main.mjs
+
+```js
+
+//#region another/b/index.js
+const b = 100;
+
+//#endregion
+//#region main.js
+console.log(b);
+
+//#endregion
+```

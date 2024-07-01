@@ -1,102 +1,132 @@
 use std::{path::Path, sync::Arc};
 
+use anyhow::Result;
 use futures::future::join_all;
-use index_vec::IndexVec;
-use oxc::span::SourceType;
-use rolldown_common::{
-  AstScope, FilePath, ImportRecordId, ModuleType, NormalModuleId, RawImportRecord, ResolvedPath,
-  ResourceId, SymbolRef,
+use oxc::{
+  index::IndexVec,
+  semantic::{ScopeTree, SymbolTable},
 };
-use rolldown_oxc_utils::{OxcCompiler, OxcProgram};
+use rolldown_common::{
+  side_effects::{DeterminedSideEffects, HookSideEffects},
+  AstScopes, ImportRecordId, ModuleDefFormat, ModuleType, NormalModule, NormalModuleId,
+  PackageJson, RawImportRecord, ResolvedPath, ResolvedRequestInfo, ResourceId, SymbolRef,
+  TreeshakeOptions,
+};
+use rolldown_error::BuildError;
+use rolldown_oxc_utils::OxcAst;
 use rolldown_plugin::{HookResolveIdExtraOptions, SharedPluginDriver};
-use sugar_path::AsPath;
+use rolldown_resolver::ResolveError;
+use rolldown_utils::{ecma_script::legitimize_identifier_name, path_ext::PathExt};
+use sugar_path::SugarPath;
 
-use super::{module_task_context::ModuleTaskCommonData, Msg};
+use super::{task_context::TaskContext, Msg};
 use crate::{
   ast_scanner::{AstScanner, ScanResult},
-  error::{BatchedErrors, BatchedResult},
   module_loader::NormalModuleTaskResult,
-  options::normalized_input_options::SharedNormalizedInputOptions,
-  types::{
-    ast_symbols::AstSymbols, normal_module_builder::NormalModuleBuilder,
-    resolved_request_info::ResolvedRequestInfo,
+  runtime::ROLLDOWN_RUNTIME_RESOURCE_ID,
+  types::ast_symbols::AstSymbols,
+  utils::{
+    load_source::load_source, make_ast_symbol_and_scope::make_ast_scopes_and_symbols,
+    parse_to_ast::parse_to_ast, resolve_id::resolve_id, transform_source::transform_source,
   },
-  utils::{load_source::load_source, resolve_id::resolve_id, transform_source::transform_source},
-  SharedResolver,
+  SharedOptions, SharedResolver,
 };
-pub struct NormalModuleTask<'task> {
-  ctx: &'task ModuleTaskCommonData,
+pub struct NormalModuleTask {
+  ctx: Arc<TaskContext>,
   module_id: NormalModuleId,
   resolved_path: ResolvedPath,
-  module_type: ModuleType,
-  errors: BatchedErrors,
+  package_json: Option<Arc<PackageJson>>,
+  module_type: ModuleDefFormat,
+  errors: Vec<BuildError>,
+  is_user_defined_entry: bool,
+  side_effects: Option<HookSideEffects>,
 }
 
-impl<'task> NormalModuleTask<'task> {
+impl NormalModuleTask {
   pub fn new(
-    ctx: &'task ModuleTaskCommonData,
+    ctx: Arc<TaskContext>,
     id: NormalModuleId,
     path: ResolvedPath,
-    module_type: ModuleType,
+    module_type: ModuleDefFormat,
+    is_user_defined_entry: bool,
+    package_json: Option<Arc<PackageJson>>,
+    side_effects: Option<HookSideEffects>,
   ) -> Self {
-    Self { ctx, module_id: id, resolved_path: path, module_type, errors: BatchedErrors::default() }
+    Self {
+      ctx,
+      module_id: id,
+      resolved_path: path,
+      module_type,
+      errors: vec![],
+      is_user_defined_entry,
+      package_json,
+      side_effects,
+    }
   }
 
+  #[tracing::instrument(name="NormalModuleTask::run", level = "trace", skip_all, fields(module_path = ?self.resolved_path))]
   pub async fn run(mut self) {
     match self.run_inner().await {
       Ok(()) => {
         if !self.errors.is_empty() {
-          self.ctx.tx.send(Msg::BuildErrors(self.errors)).expect("Send should not fail");
+          self.ctx.tx.send(Msg::BuildErrors(self.errors)).await.expect("Send should not fail");
         }
       }
       Err(err) => {
-        self.ctx.tx.send(Msg::Panics(err)).expect("Send should not fail");
+        self.ctx.tx.send(Msg::Panics(err)).await.expect("Send should not fail");
       }
     }
   }
 
-  async fn run_inner(&mut self) -> anyhow::Result<()> {
-    tracing::trace!("process {:?}", self.resolved_path);
-
+  #[allow(clippy::too_many_lines)]
+  async fn run_inner(&mut self) -> Result<()> {
+    let mut hook_side_effects = self.side_effects.take();
     let mut sourcemap_chain = vec![];
     let mut warnings = vec![];
 
-    // Run plugin load to get content first, if it is None using read fs as fallback.
-    let source = match load_source(
-      &self.ctx.plugin_driver,
-      &self.resolved_path,
-      &self.ctx.fs,
-      &mut sourcemap_chain,
-    )
-    .await
-    {
-      Ok(ret) => ret,
-      Err(errs) => {
-        self.errors.extend(errs);
-        return Ok(());
-      }
+    let module_type = {
+      let ext =
+        self.resolved_path.path.as_path().extension().and_then(|ext| ext.to_str()).unwrap_or("js");
+      let module_type = self.ctx.input_options.module_types.get(ext);
+
+      // FIXME: Once we support more types, we should return error instead of defaulting to JS.
+      module_type.copied().unwrap_or(ModuleType::Js)
     };
 
+    // Run plugin load to get content first, if it is None using read fs as fallback.
+    let source = load_source(
+      &self.ctx.plugin_driver,
+      &self.resolved_path,
+      module_type,
+      &self.ctx.fs,
+      &mut sourcemap_chain,
+      &mut hook_side_effects,
+    )
+    .await?;
+
     // Run plugin transform.
-    let source: Arc<str> = match transform_source(
+    let source: Arc<str> = transform_source(
       &self.ctx.plugin_driver,
       &self.resolved_path,
       source,
       &mut sourcemap_chain,
+      &mut hook_side_effects,
     )
-    .await
-    {
-      Ok(ret) => ret.into(),
-      Err(errs) => {
-        self.errors.extend(errs);
-        return Ok(());
-      }
-    };
+    .await?
+    .into();
 
-    let (ast, scope, scan_result, ast_symbol, namespace_symbol) = self.scan(&source);
-    tracing::trace!("scan {:?}", self.resolved_path);
+    let (mut ast, symbols, scopes) = parse_to_ast(
+      Path::new(&self.resolved_path.path.as_ref()),
+      &self.ctx.input_options,
+      module_type,
+      Arc::clone(&source),
+    )?;
 
-    let res = self.resolve_dependencies(&scan_result.import_records).await?;
+    let (scope, scan_result, ast_symbol, namespace_object_ref) =
+      self.scan(&mut ast, &source, symbols, scopes);
+
+    let resolved_deps =
+      self.resolve_dependencies(&scan_result.import_records, &mut warnings).await?;
 
     let ScanResult {
       named_imports,
@@ -112,133 +142,188 @@ impl<'task> NormalModuleTask<'task> {
     } = scan_result;
     warnings.extend(scan_warnings);
 
-    let builder = NormalModuleBuilder {
-      source: Some(source),
-      id: Some(self.module_id),
-      repr_name: Some(repr_name),
-      path: Some(ResourceId::new(Arc::<str>::clone(&self.resolved_path.path).into())),
-      named_imports: Some(named_imports),
-      named_exports: Some(named_exports),
-      stmt_infos: Some(stmt_infos),
-      imports: Some(imports),
-      star_exports: Some(star_exports),
-      default_export_ref,
-      scope: Some(scope),
-      exports_kind: Some(exports_kind),
-      namespace_symbol: Some(namespace_symbol),
-      module_type: self.module_type,
-      pretty_path: Some(self.resolved_path.prettify(&self.ctx.input_options.cwd)),
-      sourcemap_chain,
-      ..Default::default()
+    let mut imported_ids = vec![];
+    let mut dynamically_imported_ids = vec![];
+
+    for (record, info) in import_records.iter().zip(&resolved_deps) {
+      if record.kind.is_static() {
+        imported_ids.push(Arc::clone(&info.path.path).into());
+      } else {
+        dynamically_imported_ids.push(Arc::clone(&info.path.path).into());
+      }
+    }
+
+    let resource_id = ResourceId::new(Arc::clone(&self.resolved_path.path));
+    let stable_resource_id = resource_id.stabilize(&self.ctx.input_options.cwd);
+
+    // The side effects priority is:
+    // 1. Hook side effects
+    // 2. Package.json side effects
+    // 3. Analyzed side effects
+    // We should skip the `check_side_effects_for` if the hook side effects is not `None`.
+    let lazy_check_side_effects = || {
+      self
+        .package_json
+        .as_ref()
+        .and_then(|p| {
+          p.check_side_effects_for(&stable_resource_id).map(DeterminedSideEffects::UserDefined)
+        })
+        .unwrap_or_else(|| {
+          let analyzed_side_effects = stmt_infos.iter().any(|stmt_info| stmt_info.side_effect);
+          DeterminedSideEffects::Analyzed(analyzed_side_effects)
+        })
     };
+    let side_effects = match hook_side_effects {
+      Some(side_effects) => match side_effects {
+        HookSideEffects::True => lazy_check_side_effects(),
+        HookSideEffects::False => DeterminedSideEffects::UserDefined(false),
+        HookSideEffects::NoTreeshake => DeterminedSideEffects::NoTreeshake,
+      },
+      // If user don't specify the side effects, we use fallback value from `option.treeshake.moduleSideEffects`;
+      None => match self.ctx.input_options.treeshake {
+        // Actually this convert is not necessary, just for passing type checking
+        TreeshakeOptions::False => DeterminedSideEffects::NoTreeshake,
+        TreeshakeOptions::Option(ref opt) => {
+          if opt.module_side_effects.resolve(&stable_resource_id) {
+            lazy_check_side_effects()
+          } else {
+            DeterminedSideEffects::UserDefined(false)
+          }
+        }
+      },
+    };
+    // TODO: Should we check if there are `check_side_effects_for` returns false but there are side effects in the module?
+    let module = NormalModule {
+      source,
+      id: self.module_id,
+      repr_name,
+      stable_resource_id,
+      resource_id,
+      named_imports,
+      named_exports,
+      stmt_infos,
+      imports,
+      star_exports,
+      default_export_ref,
+      scope,
+      exports_kind,
+      namespace_object_ref,
+      def_format: self.module_type,
+      debug_resource_id: self.resolved_path.debug_display(&self.ctx.input_options.cwd),
+      sourcemap_chain,
+      exec_order: u32::MAX,
+      is_user_defined_entry: self.is_user_defined_entry,
+      import_records: IndexVec::default(),
+      is_included: false,
+      importers: vec![],
+      dynamic_importers: vec![],
+      imported_ids,
+      dynamically_imported_ids,
+      side_effects,
+      module_type,
+    };
+
+    self.ctx.plugin_driver.module_parsed(Arc::new(module.to_module_info())).await?;
 
     self
       .ctx
       .tx
       .send(Msg::NormalModuleDone(NormalModuleTaskResult {
-        resolved_deps: res,
+        resolved_deps,
         module_id: self.module_id,
         warnings,
         ast_symbol,
-        builder,
+        module,
         raw_import_records: import_records,
         ast,
       }))
+      .await
       .expect("Send should not fail");
-    tracing::trace!("end process {:?}", self.resolved_path);
     Ok(())
   }
 
-  fn scan(&self, source: &Arc<str>) -> (OxcProgram, AstScope, ScanResult, AstSymbols, SymbolRef) {
-    fn determine_oxc_source_type(path: impl AsRef<Path>, ty: ModuleType) -> SourceType {
-      // Determine oxc source type for parsing
-      let mut default = SourceType::default().with_module(true);
-      // Rolldown considers module as esm by default.
-      debug_assert!(default.is_module());
-      debug_assert!(default.is_javascript());
-      debug_assert!(!default.is_jsx());
-      let extension = path.as_ref().extension().and_then(std::ffi::OsStr::to_str);
-      default = match ty {
-        ModuleType::CJS | ModuleType::CjsPackageJson => default.with_script(true),
-        _ => default,
-      };
-      if let Some(ext) = extension {
-        default = match ext {
-          "cjs" => default.with_script(true),
-          "jsx" => default.with_jsx(true),
-          _ => default,
-        };
-      };
-      default
-    }
+  fn scan(
+    &self,
+    ast: &mut OxcAst,
+    source: &Arc<str>,
+    symbols: SymbolTable,
+    scopes: ScopeTree,
+  ) -> (AstScopes, ScanResult, AstSymbols, SymbolRef) {
+    let (mut ast_symbols, ast_scopes) = make_ast_scopes_and_symbols(symbols, scopes);
+    let file_path: ResourceId = Arc::<str>::clone(&self.resolved_path.path).into();
+    let repr_name = file_path.as_path().representative_file_name();
+    let repr_name = legitimize_identifier_name(&repr_name);
 
-    let source_type =
-      determine_oxc_source_type(self.resolved_path.path.as_path(), self.module_type);
-    let mut program = OxcCompiler::parse(Arc::clone(source), source_type);
-
-    let semantic = program.make_semantic(source_type);
-    let (mut symbol_table, scope) = semantic.into_symbol_table_and_scope_tree();
-    let ast_scope = AstScope::new(
-      scope,
-      std::mem::take(&mut symbol_table.references),
-      std::mem::take(&mut symbol_table.resolved_references),
-    );
-    let mut symbol_for_module = AstSymbols::from_symbol_table(symbol_table);
-    let file_path = Arc::<str>::clone(&self.resolved_path.path).into();
-    let repr_name = FilePath::representative_name(&file_path);
     let scanner = AstScanner::new(
       self.module_id,
-      &ast_scope,
-      &mut symbol_for_module,
+      &ast_scopes,
+      &mut ast_symbols,
       repr_name.into_owned(),
       self.module_type,
       source,
       &file_path,
+      &ast.trivias,
     );
-    let namespace_symbol = scanner.namespace_ref;
-    program.hoist_import_export_from_stmts();
-    let scan_result = scanner.scan(program.program());
+    let namespace_object_ref = scanner.namespace_object_ref;
+    let scan_result = scanner.scan(ast.program());
 
-    (program, ast_scope, scan_result, symbol_for_module, namespace_symbol)
+    (ast_scopes, scan_result, ast_symbols, namespace_object_ref)
   }
 
-  #[allow(clippy::option_if_let_else)]
   pub(crate) async fn resolve_id(
-    input_options: &SharedNormalizedInputOptions,
+    input_options: &SharedOptions,
     resolver: &SharedResolver,
     plugin_driver: &SharedPluginDriver,
     importer: &str,
     specifier: &str,
     options: HookResolveIdExtraOptions,
-  ) -> BatchedResult<ResolvedRequestInfo> {
+  ) -> anyhow::Result<Result<ResolvedRequestInfo, ResolveError>> {
     // Check external with unresolved path
-    if input_options.external.call(specifier.to_string(), Some(importer.to_string()), false).await?
-    {
-      return Ok(ResolvedRequestInfo {
+    if let Some(is_external) = input_options.external.as_ref() {
+      if is_external(specifier, Some(importer), false).await? {
+        return Ok(Ok(ResolvedRequestInfo {
+          path: specifier.to_string().into(),
+          module_type: ModuleDefFormat::Unknown,
+          is_external: true,
+          package_json: None,
+          side_effects: None,
+        }));
+      }
+    }
+
+    // Check runtime module
+    if specifier == ROLLDOWN_RUNTIME_RESOURCE_ID {
+      return Ok(Ok(ResolvedRequestInfo {
         path: specifier.to_string().into(),
-        module_type: ModuleType::Unknown,
-        is_external: true,
-      });
+        module_type: ModuleDefFormat::EsmMjs,
+        is_external: false,
+        package_json: None,
+        side_effects: None,
+      }));
     }
 
-    let mut info =
-      resolve_id(resolver, plugin_driver, specifier, Some(importer), options, false).await?;
+    let resolved_id =
+      resolve_id(resolver, plugin_driver, specifier, Some(importer), options).await?;
 
-    if !info.is_external {
-      // Check external with resolved path
-      info.is_external = input_options
-        .external
-        .call(specifier.to_string(), Some(importer.to_string()), true)
-        .await?;
+    match resolved_id {
+      Ok(mut resolved_id) => {
+        if !resolved_id.is_external {
+          // Check external with resolved path
+          if let Some(is_external) = input_options.external.as_ref() {
+            resolved_id.is_external = is_external(specifier, Some(importer), true).await?;
+          }
+        }
+        Ok(Ok(resolved_id))
+      }
+      Err(e) => Ok(Err(e)),
     }
-    Ok(info)
   }
 
-  #[tracing::instrument(skip_all)]
   async fn resolve_dependencies(
     &mut self,
     dependencies: &IndexVec<ImportRecordId, RawImportRecord>,
-  ) -> anyhow::Result<IndexVec<ImportRecordId, ResolvedRequestInfo>> {
+    warnings: &mut Vec<BuildError>,
+  ) -> Result<IndexVec<ImportRecordId, ResolvedRequestInfo>> {
     let jobs = dependencies.iter_enumerated().map(|(idx, item)| {
       let specifier = item.module_request.clone();
       let input_options = Arc::clone(&self.ctx.input_options);
@@ -247,8 +332,7 @@ impl<'task> NormalModuleTask<'task> {
       let plugin_driver = Arc::clone(&self.ctx.plugin_driver);
       let importer = self.resolved_path.clone();
       let kind = item.kind;
-      // let on_warn = self.input_options.on_warn.clone();
-      tokio::spawn(async move {
+      async move {
         Self::resolve_id(
           &input_options,
           &resolver,
@@ -258,37 +342,53 @@ impl<'task> NormalModuleTask<'task> {
           HookResolveIdExtraOptions { is_entry: false, kind },
         )
         .await
-        .map(|id| (idx, id))
-      })
+        .map(|id| (specifier, idx, id))
+      }
     });
 
     let resolved_ids = join_all(jobs).await;
 
-    let mut errors = BatchedErrors::default();
     let mut ret = IndexVec::with_capacity(dependencies.len());
-    resolved_ids.into_iter().try_for_each(|handle| -> anyhow::Result<()> {
-      let handle = handle?;
-      match handle {
-        Ok((_idx, item)) => {
-          ret.push(item);
-        }
-        Err(e) => {
-          errors.extend(e);
-        }
-      }
-      Ok(())
-    })?;
+    let mut build_errors = vec![];
+    for resolved_id in resolved_ids {
+      let (specifier, idx, resolved_id) = resolved_id?;
 
-    if errors.is_empty() {
+      match resolved_id {
+        Ok(info) => {
+          ret.push(info);
+        }
+        Err(e) => match &e {
+          ResolveError::NotFound(..) => {
+            warnings.push(
+              BuildError::unresolved_import_treated_as_external(
+                specifier.to_string(),
+                self.resolved_path.path.to_string(),
+                Some(e),
+              )
+              .with_severity_warning(),
+            );
+            ret.push(ResolvedRequestInfo {
+              path: specifier.to_string().into(),
+              module_type: ModuleDefFormat::Unknown,
+              is_external: true,
+              package_json: None,
+              side_effects: None,
+            });
+          }
+          _ => {
+            build_errors.push((&dependencies[idx], e));
+          }
+        },
+      }
+    }
+
+    if build_errors.is_empty() {
       Ok(ret)
     } else {
-      // TODO: The better way here is to filter out the failed-resolved dependencies and return
-      // `Ok(rwt)` with recoverable errors `self.errors` instead of returning `Err` and causing panicking.
       let resolved_err = anyhow::format_err!(
-        "Resolver errors in {:?} => dependencies: {dependencies:#?}, errors: {errors:#?}",
-        self.resolved_path
+        "Unexpectedly failed to resolve dependencies of {importer}. Got errors {build_errors:#?}",
+        importer = self.resolved_path.path,
       );
-      self.errors.extend(errors);
       Err(resolved_err)
     }
   }

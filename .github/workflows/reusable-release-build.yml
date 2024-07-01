@@ -70,17 +70,22 @@ jobs:
             build: |
               export CARGO_BUILD_TARGET=aarch64-unknown-linux-musl;
               pnpm ci:build-release-binding -x --target aarch64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: wasm32-wasip1-threads
+            build: |
+              export CARGO_BUILD_TARGET=wasm32-wasip1-threads;
+              pnpm --filter rolldown build-binding:wasi:release
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: moonrepo/setup-rust@v1
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          cache-base: main
+          cache-key: release-build
 
-      - name: Add Rust Target
+      - name: Rustup Adds Target
         run: rustup target add ${{ matrix.target }}
 
       - uses: goto-bus-stop/setup-zig@v2
@@ -98,17 +103,8 @@ jobs:
         run: pip install setuptools
         if: ${{ matrix.os == 'macos-latest' }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-
-      - name: Install node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
 
       - name: Build Binding
         run: ${{ matrix.build }}
@@ -119,7 +115,9 @@ jobs:
         with:
           if-no-files-found: error
           name: bindings-${{ matrix.target }}
-          path: packages/rolldown/src/rolldown-binding.*.node
+          path: |
+            packages/rolldown/src/rolldown-binding.*.node
+            packages/rolldown/src/rolldown-binding.*.wasm
 
   build-node-packages:
     strategy:
@@ -129,21 +127,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-
-      - name: Install node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
 
       - name: Build Node Packages
         # Binaries are built in the previous steps. Unlike in local development, we only need to build the node package itself.
         run: pnpm --filter rolldown build-node
+
+      - name: Build Type Definitions
+        run: pnpm --filter rolldown build-types
 
       - name: Upload Node Artifact
         uses: actions/upload-artifact@v4

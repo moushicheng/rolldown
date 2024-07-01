@@ -8,9 +8,14 @@ input_file: crates/rolldown/tests/esbuild/import_star/re_export_star_name_collis
 ## entry_js.mjs
 
 ```js
-// c.js
+import { default as assert } from "node:assert";
+
+//#region c.js
 let x = 1, y = 2;
 
-// entry.js
-console.log(x, y);
+//#endregion
+//#region entry.js
+assert(x === 1 && y === 2);
+
+//#endregion
 ```

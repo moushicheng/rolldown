@@ -1,11 +1,12 @@
-use index_vec::IndexVec;
-use rolldown_common::{ExportsKind, ModuleId, NormalModule, NormalModuleId, StmtInfo, WrapKind};
+use oxc::index::IndexVec;
+use rolldown_common::{
+  ExportsKind, ModuleId, NormalModule, NormalModuleId, NormalModuleVec, StmtInfo, WrapKind,
+};
 
 use crate::{
   runtime::RuntimeModuleBrief,
   types::{
     linking_metadata::{LinkingMetadata, LinkingMetadataVec},
-    module_table::NormalModuleVec,
     symbols::Symbols,
   },
 };
@@ -59,7 +60,7 @@ fn has_dynamic_exports_due_to_export_star(
     return true;
   }
 
-  let has_dynamic_exports = module.star_export_modules().any(|importee_id| match importee_id {
+  let has_dynamic_exports = module.star_export_module_ids().any(|importee_id| match importee_id {
     rolldown_common::ModuleId::Normal(importee_id) => {
       target != importee_id
         && has_dynamic_exports_due_to_export_star(
@@ -78,12 +79,13 @@ fn has_dynamic_exports_due_to_export_star(
 }
 
 impl LinkStage<'_> {
+  #[tracing::instrument(level = "debug", skip_all)]
   pub fn wrap_modules(&mut self) {
     let mut visited_modules_for_wrapping =
-      index_vec::index_vec![false; self.module_table.normal_modules.len()];
+      oxc::index::index_vec![false; self.module_table.normal_modules.len()];
 
     let mut visited_modules_for_dynamic_exports =
-      index_vec::index_vec![false; self.module_table.normal_modules.len()];
+      oxc::index::index_vec![false; self.module_table.normal_modules.len()];
 
     for module in &self.module_table.normal_modules {
       let module_id = module.id;
@@ -153,7 +155,7 @@ pub fn create_wrapper(
       let stmt_info = StmtInfo {
         stmt_idx: None,
         declared_symbols: vec![wrapper_ref],
-        referenced_symbols: vec![runtime.resolve_symbol("__commonJSMin")],
+        referenced_symbols: vec![runtime.resolve_symbol("__commonJSMin").into()],
         side_effect: false,
         is_included: false,
         import_records: Vec::new(),
@@ -178,7 +180,7 @@ pub fn create_wrapper(
       let stmt_info = StmtInfo {
         stmt_idx: None,
         declared_symbols: vec![wrapper_ref],
-        referenced_symbols: vec![runtime.resolve_symbol("__esmMin")],
+        referenced_symbols: vec![runtime.resolve_symbol("__esmMin").into()],
         side_effect: false,
         is_included: false,
         import_records: Vec::new(),

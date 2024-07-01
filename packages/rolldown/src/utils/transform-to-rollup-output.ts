@@ -1,14 +1,21 @@
-import {
+import type {
   RolldownOutput,
   RolldownOutputAsset,
   RolldownOutputChunk,
+  SourceMap,
 } from '../types/rolldown-output'
-import { OutputBundle } from '../types/output-bundle'
-import {
+import type { OutputBundle } from '../types/output-bundle'
+import type {
   BindingOutputAsset,
   BindingOutputChunk,
   BindingOutputs,
+  FinalBindingOutputs,
 } from '../binding'
+import {
+  AssetSource,
+  bindingAssetSource,
+  transformAssetSource,
+} from './asset-source'
 
 function transformToRollupOutputChunk(
   chunk: BindingOutputChunk,
@@ -18,11 +25,24 @@ function transformToRollupOutputChunk(
     get code() {
       return chunk.code
     },
+    set code(code: string) {
+      chunk.code = code
+    },
     fileName: chunk.fileName,
+    name: chunk.name,
     get modules() {
       return Object.fromEntries(
         Object.entries(chunk.modules).map(([key, _]) => [key, {}]),
       )
+    },
+    get imports() {
+      return chunk.imports
+    },
+    set imports(imports: string[]) {
+      chunk.imports = imports
+    },
+    get dynamicImports() {
+      return chunk.dynamicImports
     },
     exports: chunk.exports,
     isEntry: chunk.isEntry,
@@ -34,7 +54,11 @@ function transformToRollupOutputChunk(
     get map() {
       return chunk.map ? JSON.parse(chunk.map) : null
     },
+    set map(map: SourceMap) {
+      chunk.map = JSON.stringify(map)
+    },
     sourcemapFileName: chunk.sourcemapFileName || null,
+    preliminaryFileName: chunk.preliminaryFileName,
   }
 }
 
@@ -44,14 +68,17 @@ function transformToRollupOutputAsset(
   return {
     type: 'asset',
     fileName: asset.fileName,
-    get source() {
-      return asset.source
+    get source(): AssetSource {
+      return transformAssetSource(asset.source)
+    },
+    set source(source: AssetSource) {
+      asset.source = bindingAssetSource(source)
     },
   }
 }
 
 export function transformToRollupOutput(
-  output: BindingOutputs,
+  output: BindingOutputs | FinalBindingOutputs,
 ): RolldownOutput {
   const { chunks, assets } = output
   const [firstChunk, ...restChunks] = chunks
@@ -65,7 +92,15 @@ export function transformToRollupOutput(
 }
 
 export function transformToOutputBundle(output: BindingOutputs): OutputBundle {
-  return Object.fromEntries(
+  const bundle = Object.fromEntries(
     transformToRollupOutput(output).output.map((item) => [item.fileName, item]),
   )
+  return new Proxy(bundle, {
+    deleteProperty(target, property): boolean {
+      if (typeof property === 'string') {
+        output.delete(property)
+      }
+      return true
+    },
+  })
 }

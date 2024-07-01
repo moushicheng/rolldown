@@ -1,47 +1,45 @@
 use std::sync::Arc;
 
-use index_vec::IndexVec;
+use oxc::index::IndexVec;
 use oxc::span::SourceType;
 use rolldown_common::{
-  AstScope, ExportsKind, FilePath, ModuleType, NormalModuleId, ResourceId, SymbolRef,
+  side_effects::DeterminedSideEffects, AstScopes, ExportsKind, ModuleDefFormat, ModuleType,
+  NormalModule, NormalModuleId, ResourceId, SymbolRef,
 };
-use rolldown_error::BuildError;
-use rolldown_oxc_utils::{OxcCompiler, OxcProgram};
+use rolldown_oxc_utils::{OxcAst, OxcCompiler};
 
 use super::Msg;
 use crate::{
   ast_scanner::{AstScanner, ScanResult},
-  runtime::RuntimeModuleBrief,
-  types::{ast_symbols::AstSymbols, normal_module_builder::NormalModuleBuilder},
+  runtime::{RuntimeModuleBrief, ROLLDOWN_RUNTIME_RESOURCE_ID},
+  types::ast_symbols::AstSymbols,
+  utils::tweak_ast_for_scanning::tweak_ast_for_scanning,
 };
 pub struct RuntimeNormalModuleTask {
-  tx: tokio::sync::mpsc::UnboundedSender<Msg>,
+  tx: tokio::sync::mpsc::Sender<Msg>,
   module_id: NormalModuleId,
-  warnings: Vec<BuildError>,
+  // warnings: Vec<BuildError>,
 }
 
 pub struct RuntimeNormalModuleTaskResult {
   pub runtime: RuntimeModuleBrief,
   pub ast_symbol: AstSymbols,
-  pub ast: OxcProgram,
-  pub warnings: Vec<BuildError>,
-  pub builder: NormalModuleBuilder,
+  pub ast: OxcAst,
+  // pub warnings: Vec<BuildError>,
+  pub module: NormalModule,
 }
 
 impl RuntimeNormalModuleTask {
-  pub fn new(id: NormalModuleId, tx: tokio::sync::mpsc::UnboundedSender<Msg>) -> Self {
-    Self { module_id: id, tx, warnings: Vec::default() }
+  pub fn new(id: NormalModuleId, tx: tokio::sync::mpsc::Sender<Msg>) -> Self {
+    Self { module_id: id, tx }
   }
 
-  #[tracing::instrument(skip_all)]
-  pub fn run(self) {
-    tracing::trace!("process <runtime>");
-    let mut builder = NormalModuleBuilder::default();
-
+  #[tracing::instrument(name = "RuntimeNormalModuleTaskResult::run", level = "debug", skip_all)]
+  pub fn run(self) -> anyhow::Result<()> {
     let source: Arc<str> =
       include_str!("../runtime/runtime-without-comments.js").to_string().into();
 
-    let (ast, scope, scan_result, symbol, namespace_symbol) = self.make_ast(&source);
+    let (ast, scope, scan_result, symbol, namespace_object_ref) = self.make_ast(&source)?;
 
     let runtime = RuntimeModuleBrief::new(self.module_id, &scope);
 
@@ -58,64 +56,81 @@ impl RuntimeNormalModuleTask {
       warnings: _,
     } = scan_result;
 
-    builder.source = Some(source);
-    builder.id = Some(self.module_id);
-    builder.repr_name = Some(repr_name);
-    // TODO: Runtime module should not have FilePath as source id
-    builder.path = Some(ResourceId::new("runtime".to_string().into()));
-    builder.named_imports = Some(named_imports);
-    builder.named_exports = Some(named_exports);
-    builder.stmt_infos = Some(stmt_infos);
-    builder.imports = Some(imports);
-    builder.star_exports = Some(star_exports);
-    builder.default_export_ref = Some(default_export_ref.expect("should exist"));
-    builder.import_records = Some(IndexVec::default());
-    builder.scope = Some(scope);
-    builder.exports_kind = Some(ExportsKind::Esm);
-    builder.namespace_symbol = Some(namespace_symbol);
-    builder.pretty_path = Some("<runtime>".to_string());
-    builder.is_user_defined_entry = Some(false);
+    let module = NormalModule {
+      source,
+      id: self.module_id,
+      repr_name,
+      stable_resource_id: ROLLDOWN_RUNTIME_RESOURCE_ID.to_string(),
+      resource_id: ResourceId::new(ROLLDOWN_RUNTIME_RESOURCE_ID),
+      named_imports,
+      named_exports,
+      stmt_infos,
+      imports,
+      star_exports,
+      default_export_ref,
+      scope,
+      exports_kind: ExportsKind::Esm,
+      namespace_object_ref,
+      def_format: ModuleDefFormat::EsmMjs,
+      debug_resource_id: ROLLDOWN_RUNTIME_RESOURCE_ID.to_string(),
+      exec_order: u32::MAX,
+      is_user_defined_entry: false,
+      import_records: IndexVec::default(),
+      is_included: false,
+      sourcemap_chain: vec![],
+      // The internal runtime module `importers/imported` should be skip.
+      importers: vec![],
+      dynamic_importers: vec![],
+      imported_ids: vec![],
+      dynamically_imported_ids: vec![],
+      side_effects: DeterminedSideEffects::Analyzed(false),
+      module_type: ModuleType::Js,
+    };
 
-    if let Err(_err) = self.tx.send(Msg::RuntimeNormalModuleDone(RuntimeNormalModuleTaskResult {
-      warnings: self.warnings,
-      ast_symbol: symbol,
-      builder,
-      runtime,
-      ast,
-    })) {
+    if let Err(_err) =
+      self.tx.try_send(Msg::RuntimeNormalModuleDone(RuntimeNormalModuleTaskResult {
+        // warnings: self.warnings,
+        ast_symbol: symbol,
+        module,
+        runtime,
+        ast,
+      }))
+    {
       // hyf0: If main thread is dead, we should handle errors of main thread. So we just ignore the error here.
     };
+
+    Ok(())
   }
 
   fn make_ast(
     &self,
     source: &Arc<str>,
-  ) -> (OxcProgram, AstScope, ScanResult, AstSymbols, SymbolRef) {
+  ) -> anyhow::Result<(OxcAst, AstScopes, ScanResult, AstSymbols, SymbolRef)> {
     let source_type = SourceType::default();
-    let mut program = OxcCompiler::parse(Arc::clone(source), source_type);
+    let mut ast = OxcCompiler::parse(Arc::clone(source), source_type)?;
+    tweak_ast_for_scanning(&mut ast);
 
-    let semantic = program.make_semantic(source_type);
-    let (mut symbol_table, scope) = semantic.into_symbol_table_and_scope_tree();
-    let ast_scope = AstScope::new(
+    let (mut symbol_table, scope) = ast.make_symbol_table_and_scope_tree();
+    let ast_scope = AstScopes::new(
       scope,
       std::mem::take(&mut symbol_table.references),
       std::mem::take(&mut symbol_table.resolved_references),
     );
     let mut symbol_for_module = AstSymbols::from_symbol_table(symbol_table);
-    let facade_path = FilePath::new("runtime");
+    let facade_path = ResourceId::new("runtime");
     let scanner = AstScanner::new(
       self.module_id,
       &ast_scope,
       &mut symbol_for_module,
       "runtime".to_string(),
-      ModuleType::EsmMjs,
+      ModuleDefFormat::EsmMjs,
       source,
       &facade_path,
+      &ast.trivias,
     );
-    let namespace_symbol = scanner.namespace_ref;
-    program.hoist_import_export_from_stmts();
-    let scan_result = scanner.scan(program.program());
+    let namespace_symbol = scanner.namespace_object_ref;
+    let scan_result = scanner.scan(ast.program());
 
-    (program, ast_scope, scan_result, symbol_for_module, namespace_symbol)
+    Ok((ast, ast_scope, scan_result, symbol_for_module, namespace_symbol))
   }
 }

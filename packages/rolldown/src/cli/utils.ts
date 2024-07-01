@@ -1,30 +1,39 @@
-import { pathToFileURL } from 'url'
+import { pathToFileURL } from 'node:url'
 import nodePath from 'node:path'
-import { ERR_UNSUPPORTED_CONFIG_FORMAT } from './errors.js'
-import { RolldownConfigExport } from '../types/rolldown-config-export.js'
+import { createConsola } from 'consola'
+import type { ConfigExport } from '../types/config-export'
 
 /**
- * @typedef {import('../rollup').RollupOptions} RollupOptions
+ * Console logger
  */
+export const logger = createConsola({
+  formatOptions: {
+    date: false,
+  },
+})
 
-/**
- * Load a rolldown configuration file
- */
-export async function loadConfig(
-  configPath: string,
-): Promise<RolldownConfigExport | undefined> {
+export async function ensureConfig(configPath: string): Promise<ConfigExport> {
   if (!isSupportedFormat(configPath)) {
-    throw new Error(ERR_UNSUPPORTED_CONFIG_FORMAT)
+    throw new Error(
+      `Unsupported config format. Expected: \`${SUPPORTED_CONFIG_FORMATS.join(',')}\` but got \`${nodePath.extname(configPath)}\``,
+    )
   }
-  return import(pathToFileURL(configPath).toString()).then(
-    (config) => config.default,
-  )
+
+  // Ensure the path is recognized by Node.js in windows
+  const fileUrl = pathToFileURL(configPath).toString()
+
+  const configExports = await import(fileUrl)
+
+  // TODO: Could add more validation/diagnostics here to emit a nice error message
+  return configExports.default
 }
+
+const SUPPORTED_CONFIG_FORMATS = ['.js', '.mjs', '.cjs']
 
 /**
  * Check whether the configuration file is supported
  */
 function isSupportedFormat(configPath: string): boolean {
   const ext = nodePath.extname(configPath)
-  return /\.(js|mjs)$/.test(ext)
+  return SUPPORTED_CONFIG_FORMATS.includes(ext)
 }

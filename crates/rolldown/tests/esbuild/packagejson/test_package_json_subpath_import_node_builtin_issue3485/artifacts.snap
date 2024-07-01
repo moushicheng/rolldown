@@ -1,0 +1,19 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/packagejson/test_package_json_subpath_import_node_builtin_issue3485
+---
+# Assets
+
+## entry.mjs
+
+```js
+import { default as fs } from "node:fs";
+import { default as http } from "node:http";
+
+//#region entry.js
+fs.readFileSync();
+http.createServer();
+
+//#endregion
+```

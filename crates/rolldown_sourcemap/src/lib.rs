@@ -1,22 +1,14 @@
 // cSpell:disable
-pub use concat_sourcemap::{ConcatSource, RawSource, SourceMapSource};
-pub use oxc::sourcemap::SourceMap;
-// TODO bump oxc next version and using oxc::sourcemap::SourcemapVisualizer
-pub use sourcemap_visualizer::SourcemapVisualizer;
-
-use oxc::sourcemap::SourceMapBuilder;
-use rolldown_error::BuildError;
+pub use concat_sourcemap::{ConcatSource, RawSource, Source, SourceMapSource};
+pub use oxc::sourcemap::SourceMapBuilder;
+pub use oxc::sourcemap::{JSONSourceMap, SourceMap, SourcemapVisualizer};
+mod lines_count;
+pub use lines_count::lines_count;
 mod concat_sourcemap;
-mod sourcemap_visualizer;
 
-pub fn collapse_sourcemaps(
-  mut sourcemap_chain: Vec<&SourceMap>,
-) -> Result<Option<SourceMap>, BuildError> {
-  let Some(last_map) = sourcemap_chain.pop() else { return Ok(None) };
-  // If there is only one sourcemap, return it as result.
-  if sourcemap_chain.is_empty() {
-    return Ok(Some(last_map.clone()));
-  }
+pub fn collapse_sourcemaps(mut sourcemap_chain: Vec<&SourceMap>) -> Option<SourceMap> {
+  debug_assert!(sourcemap_chain.len() > 1);
+  let last_map = sourcemap_chain.pop()?;
 
   let mut sourcemap_builder = SourceMapBuilder::default();
 
@@ -56,7 +48,7 @@ pub fn collapse_sourcemaps(
     }
   }
 
-  Ok(Some(sourcemap_builder.into_sourcemap()))
+  Some(sourcemap_builder.into_sourcemap())
 }
 
 #[cfg(test)]
@@ -69,7 +61,7 @@ mod tests {
         r#"{
         "mappings": ";CAEE",
         "names": [],
-        "sources": ["helloworld.js"],
+        "sources": ["/project/foo.js"],
         "sourcesContent": ["\n\n  1 + 1;"],
         "version": 3,
         "ignoreList": []
@@ -81,7 +73,7 @@ mod tests {
         "file": "transpiled.min.js",
         "mappings": "AACCA",
         "names": ["add"],
-        "sources": ["transpiled.js"],
+        "sources": ["/project/foo_transform.js"],
         "sourcesContent": ["1+1"],
         "version": 3,
         "ignoreList": []
@@ -91,12 +83,11 @@ mod tests {
     ];
 
     let result = {
-      let map =
-        super::collapse_sourcemaps(sourcemaps.iter().collect()).expect("should not fail").unwrap();
-      map.to_json_string()
+      let map = super::collapse_sourcemaps(sourcemaps.iter().collect::<Vec<_>>()).unwrap();
+      map.to_json_string().unwrap()
     };
 
-    let expected = "{\"version\":3,\"names\":[\"add\"],\"sources\":[\"helloworld.js\"],\"sourcesContent\":[\"\\n\\n  1 + 1;\"],\"mappings\":\"AAEE\"}";
+    let expected = "{\"version\":3,\"names\":[\"add\"],\"sources\":[\"project/foo.js\"],\"sourcesContent\":[\"\\n\\n  1 + 1;\"],\"mappings\":\"AAEE\"}";
 
     assert_eq!(&result, expected);
   }

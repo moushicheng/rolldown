@@ -1,6 +1,8 @@
 use derivative::Derivative;
-use rolldown_error::BuildError;
 use serde::Deserialize;
+
+use super::binding_hook_side_effects::BindingHookSideEffects;
+use crate::types::binding_sourcemap::BindingSourcemap;
 
 #[napi_derive::napi(object)]
 #[derive(Deserialize, Default, Derivative)]
@@ -8,22 +10,18 @@ use serde::Deserialize;
 #[derivative(Debug)]
 pub struct BindingHookLoadOutput {
   pub code: String,
-  pub map: Option<String>,
+  pub side_effects: Option<BindingHookSideEffects>,
+  pub map: Option<BindingSourcemap>,
 }
 
 impl TryFrom<BindingHookLoadOutput> for rolldown_plugin::HookLoadOutput {
-  type Error = BuildError;
+  type Error = anyhow::Error;
 
   fn try_from(value: BindingHookLoadOutput) -> Result<Self, Self::Error> {
     Ok(rolldown_plugin::HookLoadOutput {
       code: value.code,
-      map: value
-        .map
-        .map(|content| {
-          rolldown_sourcemap::SourceMap::from_json_string(&content)
-            .map_err(BuildError::sourcemap_error)
-        })
-        .transpose()?,
+      map: value.map.map(TryInto::try_into).transpose()?,
+      side_effects: value.side_effects.map(Into::into),
     })
   }
 }

@@ -1,0 +1,21 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/lower/lower_async_this2016_common_js
+---
+# Assets
+
+## entry_js.mjs
+
+```js
+
+
+//#region entry.js
+var require_entry = __commonJSMin((exports, module) => {
+	exports.foo = async () => this;
+});
+
+//#endregion
+export default require_entry();
+
+```

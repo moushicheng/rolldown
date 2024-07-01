@@ -1,0 +1,32 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/packagejson/test_package_json_browser_map_module_disabled
+---
+# Assets
+
+## entry.mjs
+
+```js
+import { default as assert } from "node:assert";
+
+
+//#region (ignored) node_modules/demo-pkg
+var require_demo_pkg = __commonJSMin((exports, module) => {});
+
+//#endregion
+//#region node_modules/demo-pkg/index.js
+var require_demo_pkg_index = __commonJSMin((exports, module) => {
+	const fn$1 = require_demo_pkg();
+	module.exports = function() {
+		return fn$1();
+	};
+});
+
+//#endregion
+//#region src/entry.js
+var import_demo_pkg_index = __toESM(require_demo_pkg_index());
+assert.equal((0, import_demo_pkg_index.default)(), 234);
+
+//#endregion
+```

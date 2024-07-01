@@ -1,0 +1,16 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/dce/json_loader_remove_unused
+---
+# Assets
+
+## entry_js.mjs
+
+```js
+
+//#region entry.js
+console.log('unused import');
+
+//#endregion
+```

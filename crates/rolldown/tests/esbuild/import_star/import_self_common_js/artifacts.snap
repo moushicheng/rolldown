@@ -1,0 +1,32 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/import_star/import_self_common_js
+---
+# warnings
+
+## CIRCULAR_DEPENDENCY
+
+```text
+[CIRCULAR_DEPENDENCY] Warning: Circular dependency: entry.js -> entry.js.
+
+```
+# Assets
+
+## entry_js.mjs
+
+```js
+import { default as assert } from "node:assert";
+
+
+//#region entry.js
+var require_entry = __commonJSMin((exports, module) => {
+	var import_entry = __toESM(require_entry());
+	exports.foo = 123;
+	assert.equal(import_entry.foo, undefined);
+});
+
+//#endregion
+export default require_entry();
+
+```

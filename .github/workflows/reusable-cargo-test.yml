@@ -18,11 +18,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: moonrepo/setup-rust@v1
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          bins: just
-          cache-base: main
+          tools: just
+          cache-key: debug-build
+
+      - name: Setup Benchmark Input
+        run: just setup-bench
 
       - name: Build
         run: cargo test --no-run

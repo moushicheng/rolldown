@@ -1,0 +1,21 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/lower/lower_private_class_field_order
+---
+# Assets
+
+## entry_js.mjs
+
+```js
+import { default as assert } from "node:assert";
+
+//#region entry.js
+class Foo {
+	#foo = 123;
+	bar = this.#foo;
+}
+assert.equal(new Foo().bar, 123);
+
+//#endregion
+```

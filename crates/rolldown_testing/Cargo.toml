@@ -11,13 +11,17 @@ repository.workspace = true
 [lints]
 workspace = true
 
-[[bin]]
-bench = false
-name  = "gen_test_config_schema"
-path  = "./bin/gen_test_config_schema.rs"
-test  = false
-
 [dependencies]
-schemars   = "0.8.11"
-serde      = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+jsonschema              = { workspace = true }
+once_cell               = { workspace = true }
+rolldown                = { workspace = true }
+rolldown_common         = { workspace = true }
+rolldown_testing_config = { workspace = true }
+serde_json              = { workspace = true }
+sugar_path              = { workspace = true }
+tokio                   = { workspace = true, features = ["rt", "macros", "sync", "rt-multi-thread"] }
+
+[build-dependencies]
+rolldown_testing_config = { workspace = true }
+schemars                = { workspace = true }
+serde_json              = { workspace = true }

@@ -1,0 +1,8 @@
+{
+  "config": {
+    "external": ["node:assert"],
+    "moduleTypes": {
+      ".json2": "json"
+    }
+  }
+}

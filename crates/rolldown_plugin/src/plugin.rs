@@ -1,18 +1,20 @@
-use std::{any::Any, borrow::Cow, fmt::Debug};
+use std::{any::Any, borrow::Cow, fmt::Debug, sync::Arc};
 
 use super::plugin_context::SharedPluginContext;
 use crate::{
+  transform_plugin_context::TransformPluginContext, types::hook_render_error::HookRenderErrorArgs,
   HookBuildEndArgs, HookLoadArgs, HookLoadOutput, HookRenderChunkArgs, HookRenderChunkOutput,
-  HookResolveIdArgs, HookResolveIdOutput, HookTransformArgs,
+  HookResolveDynamicImportArgs, HookResolveIdArgs, HookResolveIdOutput, HookTransformArgs,
 };
-use rolldown_common::Output;
-use rolldown_error::BuildError;
+use anyhow::Result;
+use rolldown_common::{ModuleInfo, Output, RenderedChunk};
 
-pub type HookResolveIdReturn = Result<Option<HookResolveIdOutput>, BuildError>;
-pub type HookTransformReturn = Result<Option<HookLoadOutput>, BuildError>;
-pub type HookLoadReturn = Result<Option<HookLoadOutput>, BuildError>;
-pub type HookNoopReturn = Result<(), BuildError>;
-pub type HookRenderChunkReturn = Result<Option<HookRenderChunkOutput>, BuildError>;
+pub type HookResolveIdReturn = Result<Option<HookResolveIdOutput>>;
+pub type HookTransformReturn = Result<Option<HookLoadOutput>>;
+pub type HookLoadReturn = Result<Option<HookLoadOutput>>;
+pub type HookNoopReturn = Result<()>;
+pub type HookRenderChunkReturn = Result<Option<HookRenderChunkOutput>>;
+pub type HookAugmentChunkHashReturn = Result<Option<String>>;
 
 #[async_trait::async_trait]
 pub trait Plugin: Any + Debug + Send + Sync + 'static {
@@ -34,16 +36,35 @@ pub trait Plugin: Any + Debug + Send + Sync + 'static {
     Ok(None)
   }
 
+  #[deprecated(
+    note = "This hook is only for rollup compatibility, please use `resolve_id` instead."
+  )]
+  async fn resolve_dynamic_import(
+    &self,
+    _ctx: &SharedPluginContext,
+    _args: &HookResolveDynamicImportArgs,
+  ) -> HookResolveIdReturn {
+    Ok(None)
+  }
+
   async fn load(&self, _ctx: &SharedPluginContext, _args: &HookLoadArgs) -> HookLoadReturn {
     Ok(None)
   }
 
   async fn transform(
     &self,
-    _ctx: &SharedPluginContext,
+    _ctx: &TransformPluginContext<'_>,
     _args: &HookTransformArgs,
   ) -> HookTransformReturn {
     Ok(None)
+  }
+
+  async fn module_parsed(
+    &self,
+    _ctx: &SharedPluginContext,
+    _module_info: Arc<ModuleInfo>,
+  ) -> HookNoopReturn {
+    Ok(())
   }
 
   async fn build_end(
@@ -51,6 +72,12 @@ pub trait Plugin: Any + Debug + Send + Sync + 'static {
     _ctx: &SharedPluginContext,
     _args: Option<&HookBuildEndArgs>,
   ) -> HookNoopReturn {
+    Ok(())
+  }
+
+  // --- Generate hooks ---
+
+  async fn render_start(&self, _ctx: &SharedPluginContext) -> HookNoopReturn {
     Ok(())
   }
 
@@ -62,23 +89,35 @@ pub trait Plugin: Any + Debug + Send + Sync + 'static {
     Ok(None)
   }
 
-  // --- Generate hooks ---
+  async fn augment_chunk_hash(
+    &self,
+    _ctx: &SharedPluginContext,
+    _chunk: &RenderedChunk,
+  ) -> HookAugmentChunkHashReturn {
+    Ok(None)
+  }
 
-  #[allow(clippy::ptr_arg)]
+  async fn render_error(
+    &self,
+    _ctx: &SharedPluginContext,
+    _args: &HookRenderErrorArgs,
+  ) -> HookNoopReturn {
+    Ok(())
+  }
+
   async fn generate_bundle(
     &self,
     _ctx: &SharedPluginContext,
-    _bundle: &Vec<Output>,
+    _bundle: &mut Vec<Output>,
     _is_write: bool,
   ) -> HookNoopReturn {
     Ok(())
   }
 
-  #[allow(clippy::ptr_arg)]
   async fn write_bundle(
     &self,
     _ctx: &SharedPluginContext,
-    _bundle: &Vec<Output>,
+    _bundle: &mut Vec<Output>,
   ) -> HookNoopReturn {
     Ok(())
   }

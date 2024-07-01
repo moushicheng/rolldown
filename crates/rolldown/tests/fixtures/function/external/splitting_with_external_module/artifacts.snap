@@ -1,0 +1,38 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/fixtures/function/external/splitting_with_external_module
+---
+# Assets
+
+## entry.mjs
+
+```js
+import { value } from "./share.mjs";
+
+//#region entry.js
+console.log(value);
+
+//#endregion
+```
+## main.mjs
+
+```js
+import { value } from "./share.mjs";
+import { default as assert } from "assert";
+
+//#region main.js
+assert(value === 1);
+
+//#endregion
+```
+## share.mjs
+
+```js
+
+//#region share.js
+const value = 1;
+
+//#endregion
+export { value };
+```

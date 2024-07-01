@@ -4,7 +4,13 @@ use oxc::semantic::SymbolId;
 use oxc::span::SPAN;
 use smallvec::SmallVec;
 
-use crate::{AstSnippet, Dummy, IntoIn, TakeIn};
+use crate::allocator_helpers::into_in::IntoIn;
+use crate::allocator_helpers::take_in::TakeIn;
+use crate::AstSnippet;
+
+pub mod allocator_ext;
+pub mod span_ext;
+
 pub trait BindingIdentifierExt {
   fn expect_symbol_id(&self) -> SymbolId;
 }
@@ -63,7 +69,7 @@ impl<'ast> BindingPatternExt<'ast> for ast::BindingPattern<'ast> {
             span: SPAN,
             target: rest.unbox().argument.into_assignment_target(alloc),
           }),
-          ..Dummy::dummy(alloc)
+          ..TakeIn::dummy(alloc)
         };
         arr_pat.elements.take_in(alloc).into_iter().for_each(|binding_pat| {
           arr_target.elements.push(binding_pat.map(|binding_pat| match binding_pat.kind {
@@ -73,19 +79,15 @@ impl<'ast> BindingPatternExt<'ast> for ast::BindingPattern<'ast> {
                 ast::AssignmentTargetWithDefault {
                   binding: assign_pat.left.into_assignment_target(alloc),
                   init: assign_pat.right,
-                  ..Dummy::dummy(alloc)
+                  ..TakeIn::dummy(alloc)
                 }
                 .into_in(alloc),
               )
             }
-            _ => ast::AssignmentTargetMaybeDefault::AssignmentTarget(
-              binding_pat.into_assignment_target(alloc),
-            ),
+            _ => ast::AssignmentTargetMaybeDefault::from(binding_pat.into_assignment_target(alloc)),
           }));
         });
-        ast::AssignmentTarget::AssignmentTargetPattern(
-          ast::AssignmentTargetPattern::ArrayAssignmentTarget(arr_target.into_in(alloc)),
-        )
+        ast::AssignmentTarget::ArrayAssignmentTarget(arr_target.into_in(alloc))
       }
       ast::BindingPatternKind::AssignmentPattern(_) => {
         unreachable!("`BindingPatternKind::AssignmentPattern` should be pre-handled in above")
@@ -108,24 +110,17 @@ pub trait StatementExt<'me, 'ast> {
   fn is_function_declaration(&self) -> bool;
   fn as_function_declaration(&self) -> Option<&ast::Function<'ast>>;
 
-  fn as_module_declaration(&self) -> Option<&ast::ModuleDeclaration<'ast>>;
   fn is_module_declaration_with_source(&self) -> bool;
 }
 
 impl<'me, 'ast> StatementExt<'me, 'ast> for ast::Statement<'ast> {
   fn is_import_declaration(&self) -> bool {
-    matches!(
-      self,
-      ast::Statement::ModuleDeclaration(module_decl)
-        if matches!(module_decl.0, ast::ModuleDeclaration::ImportDeclaration(_))
-    )
+    matches!(self, ast::Statement::ImportDeclaration(_))
   }
 
   fn as_import_declaration(&self) -> Option<&ast::ImportDeclaration<'ast>> {
-    if let ast::Statement::ModuleDeclaration(module_decl) = self {
-      if let ast::ModuleDeclaration::ImportDeclaration(import_decl) = &module_decl.0 {
-        return Some(import_decl);
-      }
+    if let ast::Statement::ImportDeclaration(import_decl) = self {
+      return Some(&**import_decl);
     }
     None
   }
@@ -133,49 +128,35 @@ impl<'me, 'ast> StatementExt<'me, 'ast> for ast::Statement<'ast> {
   fn as_export_default_declaration_mut(
     &mut self,
   ) -> Option<&mut ast::ExportDefaultDeclaration<'ast>> {
-    if let ast::Statement::ModuleDeclaration(export_default_decl) = self {
-      if let ast::ModuleDeclaration::ExportDefaultDeclaration(export_default_decl) =
-        &mut export_default_decl.0
-      {
-        return Some(export_default_decl);
-      }
+    if let ast::Statement::ExportDefaultDeclaration(export_default_decl) = self {
+      return Some(&mut **export_default_decl);
     }
     None
   }
 
   fn as_export_all_declaration(&self) -> Option<&ast::ExportAllDeclaration<'ast>> {
-    if let ast::Statement::ModuleDeclaration(export_all_decl) = self {
-      if let ast::ModuleDeclaration::ExportAllDeclaration(export_all_decl) = &export_all_decl.0 {
-        return Some(export_all_decl);
-      }
+    if let ast::Statement::ExportAllDeclaration(export_all_decl) = self {
+      return Some(&**export_all_decl);
     }
     None
   }
 
   fn as_export_named_declaration(&self) -> Option<&ast::ExportNamedDeclaration<'ast>> {
-    if let ast::Statement::ModuleDeclaration(export_named_decl) = self {
-      if let ast::ModuleDeclaration::ExportNamedDeclaration(export_named_decl) =
-        &export_named_decl.0
-      {
-        return Some(export_named_decl);
-      }
+    if let ast::Statement::ExportNamedDeclaration(export_named_decl) = self {
+      return Some(&**export_named_decl);
     }
     None
   }
 
   fn as_export_named_declaration_mut(&mut self) -> Option<&mut ast::ExportNamedDeclaration<'ast>> {
-    if let ast::Statement::ModuleDeclaration(export_named_decl) = self {
-      if let ast::ModuleDeclaration::ExportNamedDeclaration(export_named_decl) =
-        &mut export_named_decl.0
-      {
-        return Some(export_named_decl);
-      }
+    if let ast::Statement::ExportNamedDeclaration(export_named_decl) = self {
+      return Some(&mut **export_named_decl);
     }
     None
   }
 
   fn as_function_declaration(&self) -> Option<&ast::Function<'ast>> {
-    if let ast::Statement::Declaration(ast::Declaration::FunctionDeclaration(func_decl)) = self {
+    if let ast::Statement::FunctionDeclaration(func_decl) = self {
       Some(func_decl)
     } else {
       None
@@ -186,14 +167,7 @@ impl<'me, 'ast> StatementExt<'me, 'ast> for ast::Statement<'ast> {
     self.as_function_declaration().is_some()
   }
 
-  fn as_module_declaration(&self) -> Option<&ast::ModuleDeclaration<'ast>> {
-    if let ast::Statement::ModuleDeclaration(module_decl) = self {
-      Some(module_decl)
-    } else {
-      None
-    }
-  }
-
+  /// Check if the statement is `[import|export] ... from ...` or `export ... from ...`
   fn is_module_declaration_with_source(&self) -> bool {
     matches!(self.as_module_declaration(), Some(decl) if decl.source().is_some())
   }
@@ -201,6 +175,7 @@ impl<'me, 'ast> StatementExt<'me, 'ast> for ast::Statement<'ast> {
 
 pub trait ExpressionExt<'ast> {
   fn as_call_expression(&self) -> Option<&ast::CallExpression<'ast>>;
+  fn as_call_expression_mut(&mut self) -> Option<&mut ast::CallExpression<'ast>>;
 
   fn as_identifier(&self) -> Option<&ast::IdentifierReference<'ast>>;
   fn as_identifier_mut(&mut self) -> Option<&mut ast::IdentifierReference<'ast>>;
@@ -208,6 +183,14 @@ pub trait ExpressionExt<'ast> {
 
 impl<'ast> ExpressionExt<'ast> for ast::Expression<'ast> {
   fn as_call_expression(&self) -> Option<&ast::CallExpression<'ast>> {
+    if let ast::Expression::CallExpression(call_expr) = self {
+      Some(call_expr)
+    } else {
+      None
+    }
+  }
+
+  fn as_call_expression_mut(&mut self) -> Option<&mut ast::CallExpression<'ast>> {
     if let ast::Expression::CallExpression(call_expr) = self {
       Some(call_expr)
     } else {
@@ -230,10 +213,4 @@ impl<'ast> ExpressionExt<'ast> for ast::Expression<'ast> {
       None
     }
   }
-}
-
-pub trait De<'ast> {
-  fn as_call_expression(&self) -> Option<&ast::CallExpression<'ast>>;
-
-  fn as_identifier(&self) -> Option<&ast::IdentifierReference>;
 }

@@ -8,9 +8,14 @@ input_file: crates/rolldown/tests/esbuild/default/require_parent_dir_es6
 ## dir_entry_js.mjs
 
 ```js
-// index.js
+import { default as assert } from "node:assert";
+
+//#region index.js
 var require_parent_dir_es6_index_default = 123;
 
-// dir/entry.js
-console.log(require_parent_dir_es6_index_default);
+//#endregion
+//#region dir/entry.js
+assert.equal(require_parent_dir_es6_index_default, 123);
+
+//#endregion
 ```

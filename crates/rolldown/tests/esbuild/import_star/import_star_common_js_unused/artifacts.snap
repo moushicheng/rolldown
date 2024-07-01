@@ -8,15 +8,19 @@ input_file: crates/rolldown/tests/esbuild/import_star/import_star_common_js_unus
 ## entry_js.mjs
 
 ```js
-import { __commonJSMin, __toESM } from "./$runtime$.mjs";
+import { default as assert } from "node:assert";
 
-// foo.js
+
+//#region foo.js
 var require_foo = __commonJSMin((exports, module) => {
 	exports.foo = 123;
 });
 
-// entry.js
+//#endregion
+//#region entry.js
 var import_foo = __toESM(require_foo());
 let foo = 234;
-console.log(foo);
+assert.equal(foo, 234);
+
+//#endregion
 ```

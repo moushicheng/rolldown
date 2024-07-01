@@ -1,15 +1,20 @@
 import process from 'node:process'
-import nodePath from 'node:path'
-import consola from 'consola'
+import parseArgs from 'mri'
 import { defineCommand, runMain, showUsage } from 'citty'
-import { loadConfig } from './utils.js'
 import { bundle } from './commands/bundle'
 import {
   version,
   description,
 } from '../../package.json' assert { type: 'json' }
+import { DEFAULT_CONFIG_FILENAME } from './constants'
 
-const DEFAULT_CONFIG_FILENAME = 'rolldown.config.js'
+interface ParsedArgs {
+  config?: string | true
+  c?: string | true
+  // `citty` intercept the help option, so we don't need to deal with it
+  // help?: boolean
+  // h?: boolean
+}
 
 const main = defineCommand({
   meta: {
@@ -22,7 +27,7 @@ const main = defineCommand({
       type: 'string',
       alias: 'c',
       description:
-        'Use this config file (if argument is used but value is unspecified, defaults to rolldown.config.js)',
+        'Use this config file (if argument is used but value is unspecified, defaults to `rolldown.config.js`)',
     },
     help: {
       type: 'boolean',
@@ -30,32 +35,22 @@ const main = defineCommand({
       description: 'Show this help message',
     },
   },
-  async run(ctx) {
-    if (ctx.args.help) {
-      await showUsage(ctx.cmd)
+  async run(_ctx) {
+    // FIXME: `citty` doesn't support detecting if an argument is unspecified
+    const parsedArgs = parseArgs<ParsedArgs>(process.argv.slice(2))
+    let argConfig = parsedArgs.c || parsedArgs.config
+    if (argConfig) {
+      // If config is specified, we will ignore other arguments and bundle with the specified config
+      if (argConfig == true) {
+        argConfig = DEFAULT_CONFIG_FILENAME
+      }
+      await bundle(argConfig)
+      process.exit(0)
       return
     }
-    const { configPath } = parseArgs(ctx.args)
 
-    const config = await loadConfig(configPath)
-
-    if (!config) {
-      consola.error(`No configuration found at ${configPath}`)
-      process.exit(1)
-    }
-
-    await bundle(config)
+    showUsage(main)
   },
 })
-
-function parseArgs(args: Record<string, any>) {
-  const { config } = args
-  const cwd = process.cwd()
-  const configPath = config
-    ? nodePath.resolve(cwd, config)
-    : nodePath.resolve(cwd, DEFAULT_CONFIG_FILENAME)
-
-  return { configPath }
-}
 
 runMain(main)

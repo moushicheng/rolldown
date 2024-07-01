@@ -8,13 +8,17 @@ input_file: crates/rolldown/tests/esbuild/default/require_parent_dir_common_js
 ## dir_entry_js.mjs
 
 ```js
-import { __commonJSMin } from "./$runtime$.mjs";
+import { default as assert } from "node:assert";
 
-// index.js
+
+//#region index.js
 var require_require_parent_dir_common_js_index = __commonJSMin((exports, module) => {
 	module.exports = 123;
 });
 
-// dir/entry.js
-console.log(require_require_parent_dir_common_js_index());
+//#endregion
+//#region dir/entry.js
+assert.deepEqual(require_require_parent_dir_common_js_index(), 123);
+
+//#endregion
 ```

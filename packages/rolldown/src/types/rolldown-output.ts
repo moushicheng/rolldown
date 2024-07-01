@@ -1,16 +1,16 @@
-import type { OutputAsset, OutputChunk, RollupOutput } from '../rollup'
-import {
+import { AssetSource } from '../utils/asset-source'
+import type { OutputAsset, OutputChunk } from '../rollup'
+import type {
   HasProperty,
   IsPropertiesEqual,
-  IsPropertyEqual,
   TypeAssert,
 } from '../utils/type-assert'
-import { RenderedModule } from './rendered-module'
+import type { RenderedModule } from './rendered-module'
 
 export interface RolldownOutputAsset {
   type: 'asset'
   fileName: string
-  source: string | Uint8Array
+  source: AssetSource
 }
 
 function _assertRolldownOutputAsset() {
@@ -22,8 +22,9 @@ export interface SourceMap {
   mappings: string
   names: string[]
   sources: string[]
-  sourcesContent: (string | null)[]
+  sourcesContent: string[]
   version: number
+  // TODO
   // toString(): string
   // toUrl(): string
 }
@@ -31,17 +32,21 @@ export interface SourceMap {
 export interface RolldownOutputChunk {
   type: 'chunk'
   code: string
+  name: string
   isEntry: boolean
   exports: string[]
   fileName: string
   modules: {
     [id: string]: RenderedModule
   }
+  imports: string[]
+  dynamicImports: string[]
   facadeModuleId: string | null
   isDynamicEntry: boolean
   moduleIds: string[]
   map: SourceMap | null
   sourcemapFileName: string | null
+  preliminaryFileName: string
 }
 
 function _assertRolldownOutputChunk() {

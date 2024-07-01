@@ -1,22 +1,60 @@
+use std::sync::Arc;
+
 use crate::{
-  HookBuildEndArgs, HookLoadArgs, HookLoadReturn, HookNoopReturn, HookRenderChunkArgs,
-  HookResolveIdArgs, HookResolveIdReturn, HookTransformArgs, PluginDriver,
+  HookBuildEndArgs, HookLoadArgs, HookLoadReturn, HookNoopReturn, HookResolveDynamicImportArgs,
+  HookResolveIdArgs, HookResolveIdReturn, HookTransformArgs, PluginDriver, TransformPluginContext,
 };
-use rolldown_error::BuildError;
+use anyhow::Result;
+use rolldown_common::{side_effects::HookSideEffects, ModuleInfo};
 use rolldown_sourcemap::SourceMap;
+use rolldown_utils::futures::block_on_spawn_all;
 
 impl PluginDriver {
+  #[tracing::instrument(level = "trace", skip_all)]
   pub async fn build_start(&self) -> HookNoopReturn {
-    // TODO should call `build_start` of all plugins in parallel
-    for (plugin, ctx) in &self.plugins {
-      plugin.build_start(ctx).await?;
+    let ret = {
+      #[cfg(not(target_arch = "wasm32"))]
+      {
+        block_on_spawn_all(self.plugins.iter().map(|(plugin, ctx)| plugin.build_start(ctx))).await
+      }
+      #[cfg(target_arch = "wasm32")]
+      {
+        // FIXME(hyf0): This is a workaround for wasm32 target, it's wired that
+        // `block_on_spawn_all(self.plugins.iter().map(|(plugin, ctx)| plugin.build_start(ctx))).await;` will emit compile errors like
+        // `implementation of `std::marker::Send` is not general enough`. It seems to be the problem related to HRTB, async and iterator.
+        // I guess we need some rust experts here.
+        let mut futures = vec![];
+        for (plugin, ctx) in &self.plugins {
+          futures.push(plugin.build_start(ctx));
+        }
+        block_on_spawn_all(futures.into_iter()).await
+      }
+    };
+
+    for r in ret {
+      r?;
     }
+
     Ok(())
   }
 
   pub async fn resolve_id(&self, args: &HookResolveIdArgs<'_>) -> HookResolveIdReturn {
     for (plugin, ctx) in &self.plugins {
       if let Some(r) = plugin.resolve_id(ctx, args).await? {
+        return Ok(Some(r));
+      }
+    }
+    Ok(None)
+  }
+
+  #[allow(deprecated)]
+  // Only for rollup compatibility
+  pub async fn resolve_dynamic_import(
+    &self,
+    args: &HookResolveDynamicImportArgs<'_>,
+  ) -> HookResolveIdReturn {
+    for (plugin, ctx) in &self.plugins {
+      if let Some(r) = plugin.resolve_dynamic_import(ctx, args).await? {
         return Ok(Some(r));
       }
     }
@@ -35,39 +73,50 @@ impl PluginDriver {
   pub async fn transform(
     &self,
     args: &HookTransformArgs<'_>,
-  ) -> Result<(String, Vec<SourceMap>), BuildError> {
-    let mut sourcemap_chain = vec![];
+    sourcemap_chain: &mut Vec<SourceMap>,
+    side_effects: &mut Option<HookSideEffects>,
+    original_code: &str,
+  ) -> Result<String> {
     let mut code = args.code.to_string();
     for (plugin, ctx) in &self.plugins {
-      if let Some(r) =
-        plugin.transform(ctx, &HookTransformArgs { id: args.id, code: &code }).await?
+      if let Some(r) = plugin
+        .transform(
+          &TransformPluginContext::new(Arc::clone(ctx), sourcemap_chain, original_code, args.id),
+          &HookTransformArgs { id: args.id, code: &code },
+        )
+        .await?
       {
-        code = r.code;
-        if let Some(map) = r.map {
+        if let Some(mut map) = r.map {
+          // If sourcemap  hasn't `sources`, using original id to fill it.
+          if map.get_source(0).map_or(true, str::is_empty) {
+            map.set_sources(vec![args.id]);
+          }
+          // If sourcemap hasn't `sourcesContent`, using original code to fill it.
+          if map.get_source_content(0).map_or(true, str::is_empty) {
+            map.set_source_contents(vec![&code]);
+          }
           sourcemap_chain.push(map);
         }
+        if let Some(v) = r.side_effects {
+          *side_effects = Some(v);
+        }
+        code = r.code;
       }
     }
-    Ok((code, sourcemap_chain))
+    Ok(code)
   }
 
-  pub async fn build_end(&self, args: Option<&HookBuildEndArgs>) -> HookNoopReturn {
-    tracing::info!("PluginDriver::build_end");
+  pub async fn module_parsed(&self, module_info: Arc<ModuleInfo>) -> HookNoopReturn {
     for (plugin, ctx) in &self.plugins {
-      plugin.build_end(ctx, args).await?;
+      plugin.module_parsed(ctx, Arc::clone(&module_info)).await?;
     }
     Ok(())
   }
 
-  pub async fn render_chunk(
-    &self,
-    mut args: HookRenderChunkArgs<'_>,
-  ) -> Result<String, BuildError> {
+  pub async fn build_end(&self, args: Option<&HookBuildEndArgs>) -> HookNoopReturn {
     for (plugin, ctx) in &self.plugins {
-      if let Some(r) = plugin.render_chunk(ctx, &args).await? {
-        args.code = r.code;
-      }
+      plugin.build_end(ctx, args).await?;
     }
-    Ok(args.code)
+    Ok(())
   }
 }

@@ -1,0 +1,26 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/import_star/export_other_as_namespace_common_js
+---
+# Assets
+
+## entry_js.cjs
+
+```js
+
+
+//#region foo.js
+var require_foo = __commonJSMin((exports, module) => {
+	exports.foo = 123;
+});
+
+//#endregion
+//#region entry.js
+var entry_ns = {};
+__export(entry_ns, {ns: () => import_foo});
+var import_foo = __toESM(require_foo());
+
+//#endregion
+module.exports = __toCommonJS(entry_ns)
+```

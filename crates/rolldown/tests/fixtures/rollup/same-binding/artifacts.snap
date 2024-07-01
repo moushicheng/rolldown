@@ -1,0 +1,20 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/fixtures/rollup/same-binding
+---
+# Assets
+
+## main.mjs
+
+```js
+
+//#region shared.js
+const foo = 1;
+
+//#endregion
+//#region main.js
+assert.strictEqual(foo, 1);
+
+//#endregion
+```

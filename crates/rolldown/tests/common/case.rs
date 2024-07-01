@@ -1,9 +1,11 @@
 use std::{borrow::Cow, path::Path};
 
 use super::fixture::Fixture;
-use rolldown::RolldownOutput;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use rolldown::BundleOutput;
 use rolldown_common::Output;
-use rolldown_error::BuildError;
+use rolldown_error::{BuildError, DiagnosticOptions};
 use rolldown_sourcemap::SourcemapVisualizer;
 
 pub struct Case {
@@ -25,31 +27,34 @@ impl Case {
   }
 
   pub async fn run_inner(mut self) {
-    let build_output = self.fixture.compile().await;
-    match build_output {
-      Ok(assets) => {
-        assert!(!self.fixture.test_config().expect_error, "expected error, but got success");
-        self.render_assets_to_snapshot(assets);
-      }
-      Err(errs) => {
-        assert!(
-          self.fixture.test_config().expect_error,
-          "expected success, but got errors: {errs:?}"
-        );
-        self.render_errors_to_snapshot(errs);
-      }
+    let build_output = self.fixture.bundle(true, false).await;
+    if build_output.errors.is_empty() {
+      assert!(!self.fixture.test_config().expect_error, "expected error, but got success");
+      self.render_assets_to_snapshot(build_output);
+    } else {
+      assert!(
+        self.fixture.test_config().expect_error,
+        "expected success, but got errors: {:?}",
+        build_output.errors
+      );
+      self.render_errors_to_snapshot(build_output.errors);
     }
     self.make_snapshot();
     self.fixture.exec();
   }
 
-  fn render_assets_to_snapshot(&mut self, outputs: RolldownOutput) {
+  fn render_assets_to_snapshot(&mut self, outputs: BundleOutput) {
     let mut assets = outputs.assets;
     let warnings = outputs.warnings;
 
     if !warnings.is_empty() {
       self.snapshot.push_str("# warnings\n\n");
-      let diagnostics = warnings.into_iter().map(|e| (e.code(), e.into_diagnostic()));
+      let diagnostics = warnings.into_iter().map(|e| {
+        (
+          e.kind(),
+          e.into_diagnostic_with(&DiagnosticOptions { cwd: self.fixture.dir_path().to_path_buf() }),
+        )
+      });
       let rendered = diagnostics
         .flat_map(|(code, diagnostic)| {
           [
@@ -66,17 +71,19 @@ impl Case {
     }
 
     self.snapshot.push_str("# Assets\n\n");
-    assets.sort_by_key(|c| c.file_name().to_string());
+    assets.sort_by_key(|c| c.filename().to_string());
     let artifacts = assets
       .iter()
-      .filter(|asset| !asset.file_name().contains("$runtime$") && matches!(asset, Output::Chunk(_)))
+      .filter(|asset| !asset.filename().contains("$runtime$") && matches!(asset, Output::Chunk(_)))
       .flat_map(|asset| {
-        [
-          Cow::Owned(format!("## {}\n", asset.file_name())),
-          "```js".into(),
-          Cow::Borrowed(asset.content().trim()),
-          "```".into(),
-        ]
+        let content = std::str::from_utf8(asset.content_as_bytes()).unwrap();
+        let content = if self.fixture.test_config().hidden_runtime_module {
+          RUNTIME_MODULE_OUTPUT_RE.replace_all(content, "")
+        } else {
+          Cow::Borrowed(content)
+        };
+
+        [Cow::Owned(format!("## {}\n", asset.filename())), "```js".into(), content, "```".into()]
       })
       .collect::<Vec<_>>()
       .join("\n");
@@ -86,7 +93,7 @@ impl Case {
       self.render_stats_to_snapshot(&assets);
     }
 
-    if self.fixture.test_config().sourcemap {
+    if self.fixture.test_config().visualize_sourcemap {
       self.render_sourcemap_visualizer_to_snapshot(&assets);
     }
   }
@@ -99,7 +106,10 @@ impl Case {
         Output::Chunk(chunk) => {
           vec![Cow::Owned(format!(
             "- {}, is_entry {}, is_dynamic_entry {}, exports {:?}",
-            chunk.file_name, chunk.is_entry, chunk.is_dynamic_entry, chunk.exports
+            chunk.filename.as_str(),
+            chunk.is_entry,
+            chunk.is_dynamic_entry,
+            chunk.exports
           ))]
         }
         Output::Asset(_) => vec![],
@@ -111,8 +121,13 @@ impl Case {
 
   fn render_errors_to_snapshot(&mut self, mut errors: Vec<BuildError>) {
     self.snapshot.push_str("# Errors\n\n");
-    errors.sort_by_key(BuildError::code);
-    let diagnostics = errors.into_iter().map(|e| (e.code(), e.into_diagnostic()));
+    errors.sort_by_key(|e| e.kind().to_string());
+    let diagnostics = errors.into_iter().map(|e| {
+      (
+        e.kind(),
+        e.into_diagnostic_with(&DiagnosticOptions { cwd: self.fixture.dir_path().to_path_buf() }),
+      )
+    });
 
     let rendered = diagnostics
       .flat_map(|(code, diagnostic)| {
@@ -132,7 +147,6 @@ impl Case {
     self.snapshot.push_str("\n\n# Sourcemap Visualizer\n\n");
     let visualizer_result = assets
       .iter()
-      .filter(|asset| !asset.file_name().contains("$runtime$"))
       .filter_map(|asset| match asset {
         Output::Chunk(chunk) => chunk
           .map
@@ -158,3 +172,8 @@ impl Case {
     });
   }
 }
+
+static RUNTIME_MODULE_OUTPUT_RE: Lazy<Regex> = Lazy::new(|| {
+  Regex::new(r"(//#region rolldown:runtime[\s\S]*?//#endregion)")
+    .expect("invalid runtime module output regex")
+});

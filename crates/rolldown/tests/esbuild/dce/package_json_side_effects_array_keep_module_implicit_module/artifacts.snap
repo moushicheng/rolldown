@@ -1,0 +1,20 @@
+---
+source: crates/rolldown/tests/common/case.rs
+expression: content
+input_file: crates/rolldown/tests/esbuild/dce/package_json_side_effects_array_keep_module_implicit_module
+---
+# Assets
+
+## src_entry_js.mjs
+
+```js
+
+//#region node_modules/demo-pkg/index-module.js
+console.log('this should be kept');
+
+//#endregion
+//#region src/entry.js
+console.log('unused import');
+
+//#endregion
+```

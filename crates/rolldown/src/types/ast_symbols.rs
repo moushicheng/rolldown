@@ -1,4 +1,4 @@
-use index_vec::IndexVec;
+use oxc::index::IndexVec;
 use oxc::{
   semantic::{ScopeId, SymbolFlags, SymbolId, SymbolTable},
   span::{CompactStr as CompactString, Span},

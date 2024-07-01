@@ -8,24 +8,32 @@ input_file: crates/rolldown/tests/esbuild/splitting/shared-es6-into-es6
 ## a.mjs
 
 ```js
-import { foo } from "./shared_js.mjs";
+import { foo } from "./shared.mjs";
+import { default as assert } from "node:assert";
 
-// a.js
-console.log(foo);
+//#region a.js
+assert.equal(foo, 123);
+
+//#endregion
 ```
 ## b.mjs
 
 ```js
-import { foo } from "./shared_js.mjs";
+import { foo } from "./shared.mjs";
+import { default as assert } from "node:assert";
 
-// b.js
-console.log(foo);
+//#region b.js
+assert.equal(foo, 123);
+
+//#endregion
 ```
-## shared_js.mjs
+## shared.mjs
 
 ```js
-// shared.js
+
+//#region shared.js
 let foo = 123;
 
+//#endregion
 export { foo };
 ```

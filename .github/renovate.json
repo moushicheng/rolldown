@@ -1,42 +1,34 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":disablePeerDependencies"],
-  "labels": ["dependencies"],
+  "extends": ["github>Boshen/renovate"],
   "ignorePaths": [
     "**/node_modules/**",
-    "**/bower_components/**",
-    "**/vendor/**",
     "**/examples/**",
-    "**/__tests__/**",
-    "**/test/**",
-    "**/__fixtures__/**"
+    "**/crates/rolldown/tests/**"
   ],
   "packageRules": [
     {
-      "matchPackageNames": ["napi", "napi-build", "napi-derive"],
-      "rangeStrategy": "replace",
-      "groupName": "napi-rs"
+      "groupName": "napi-rs",
+      "matchPackagePrefixes": ["napi"],
+      "schedule": ["at any time"]
     },
     {
-      "matchPackageNames": ["oxlint"],
-      "rangeStrategy": "replace",
-      "groupName": "oxlint"
+      "groupName": "oxlint",
+      "matchManagers": ["npm"],
+      "matchDepNames": ["oxlint"],
+      "schedule": ["at any time"]
     },
     {
-      "groupName": "all non-major dependencies",
-      "groupSlug": "all-minor-patch",
-      "matchPackagePatterns": ["*"],
-      "excludePackagePatterns": ["oxlint"],
-      "matchUpdateTypes": ["minor", "patch"]
+      "groupName": "oxc",
+      "matchManagers": ["cargo"],
+      "matchPackagePrefixes": ["oxc"],
+      "schedule": ["at any time"]
+    },
+    {
+      "groupName": "npm-rolldown",
+      "matchManagers": ["npm"],
+      "automerge": false,
+      "automergeType": "pr"
     }
-  ],
-  "commitMessagePrefix": "chore: ",
-  "commitMessageAction": "bump up",
-  "commitMessageTopic": "{{depName}} version",
-  "ignoreDeps": [],
-  "postUpdateOptions": ["pnpmDedupe"],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "extends": ["schedule:weekly"]
-  }
+  ]
 }

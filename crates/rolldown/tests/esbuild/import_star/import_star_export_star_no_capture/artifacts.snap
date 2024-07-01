@@ -8,18 +8,16 @@ input_file: crates/rolldown/tests/esbuild/import_star/import_star_export_star_no
 ## entry_js.mjs
 
 ```js
-import { __export } from "./$runtime$.mjs";
+import { default as assert } from "node:assert";
 
-// foo.js
+//#region foo.js
 const foo$1 = 123;
 
-// bar.js
-var bar_ns = {};
-__export(bar_ns, {
-	foo:() => foo$1
-});
-
-// entry.js
+//#endregion
+//#region entry.js
 let foo = 234;
-console.log(bar_ns.foo, bar_ns.foo, foo);
+assert.equal(foo$1, 123);
+assert.equal(foo, 234);
+
+//#endregion
 ```
